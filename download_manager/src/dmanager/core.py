@@ -1,46 +1,62 @@
-from __future__ import annotations
-
+from enum import Enum
 from dataclasses import dataclass
 from typing import Dict, Optional, List, Any
 from datetime import datetime
 import os
 import asyncio
-
 import aiohttp
 import aiofiles
 
+
+# TODO: Define an Event Class
+@dataclass
+class DownloadEvent:
+    pass
+
+class DownloadState(Enum):
+    PAUSED = 0
+    RUNNING = 1
+    COMPLETED = 2
+    ERROR = -1
 
 @dataclass
 class DownloadTask:
     id: str
     url: str
-    dest_path: str
-    state: str = "pending"  # pending, running, paused, cancelled, completed
+    output_file: str
+    state: DownloadState = DownloadState.PAUSED
 
 class DownloadManager:
     """
     Async download manager.
-
     """
 
     def __init__(self) -> None:
+        # TODO Add clean up self._tasks logic
         self._tasks: Dict[int, DownloadTask] = {}
-        self._next_id = 1
+        self._next_id = 0
         self.events_queue: asyncio.Queue[Dict[str, Any]] = asyncio.Queue()
+        # TODO make sure self._workers are cleaned up
         self._workers: Dict[str, asyncio.Task[Any]] = {}
 
-    def _make_id(self) -> str:
+    def _iterate_id(self) -> str:
         self._next_id += 1
         return self._next_id
 
-    def add(self, url: str, dest_path: Optional[str] = None) -> str:
-        if dest_path is None:
-            filename = url.split("/")[-1] or "download"+str(datetime.now().strftime("%m_%d_%Y_%H_%M_%S"))
+    def add_download(self, url: str, output_file: Optional[str] = None) -> int:
+        """
+        Adds a new download task.
+        
+        :param url: URL to download a file from
+        :param output_file: Output file name
+        :return: Task ID
+        """
 
-            dest_path = os.path.join(os.getcwd(), filename)
+        if output_file is None:
+            output_file = url.split("/")[-1] or "download"+str(datetime.now().strftime("%m_%d_%Y_%H_%M_%S"))
 
-        task_id = self._make_id()
-        task = DownloadTask(id=task_id, url=url, dest_path=str(dest_path))
+        task_id = self._iterate_id()
+        task = DownloadTask(id=task_id, url=url, output_file=str(output_file))
         self._tasks[task_id] = task
         return task_id
 
@@ -49,6 +65,7 @@ class DownloadManager:
 
         Returns True if the task existed, False otherwise.
         """
+
         task = self._tasks.get(task_id)
         if not task:
             return False
@@ -61,13 +78,12 @@ class DownloadManager:
             self._workers.pop(task_id, None)
 
     async def _run_download(self, task: DownloadTask) -> None:
-        task.state = "running"
+        task.state = DownloadState.RUNNING
         url = task.url
         headers: Dict[str, str] = {}
         if task.downloaded_bytes:
             headers["Range"] = f"bytes={task.downloaded_bytes}-"
 
-        # async with self._semaphore:
         session = aiohttp.ClientSession()
         try:
             async with session.get(url, headers=headers) as resp:
@@ -81,13 +97,15 @@ class DownloadManager:
 
                 async for chunk in resp.content.iter_chunked(64 * 1024):
                     try:
-                        part_path = task.dest_path + ".part"
+                        part_path = task.output_file + ".part"
                         async with aiofiles.open(part_path, "ab") as f:
                             await f.write(chunk)
                     except Exception:
                         # swallow IO errors for tests
                         pass
                     task.downloaded_bytes += len(chunk)
+
+                    # TODO: Define an Event Class
                     await self.events_queue.put({
                         "task_id": task.id,
                         "downloaded": task.downloaded_bytes,
@@ -95,21 +113,21 @@ class DownloadManager:
                         "status": "running",
                     })
 
-                task.state = "completed"
+                task.state = DownloadState.COMPLETED
                 try:
-                    part = task.dest_path + ".part"
+                    part = task.output_file + ".part"
                     if os.path.exists(part):
-                        os.replace(part, task.dest_path)
+                        os.replace(part, task.output_file)
                 except Exception:
                     pass
 
                 await self.events_queue.put({"task_id": task.id, "status": "completed"})
         except asyncio.CancelledError:
-            task.state = "paused"
+            task.state = DownloadState.PAUSED
             await self.events_queue.put({"task_id": task.id, "status": "paused"})
             raise
         except Exception:
-            task.state = "paused"
+            task.state = DownloadState.ERROR
             await self.events_queue.put({"task_id": task.id, "status": "error"})
         finally:
             close = getattr(session, "close", None)
@@ -129,35 +147,34 @@ class DownloadManager:
                 await worker
             except asyncio.CancelledError:
                 pass
-        if task.state == "running":
-            task.state = "paused"
+        if task.state == DownloadState.RUNNING:
+            task.state = DownloadState.PAUSED
         return True
 
     async def resume(self, task_id: str) -> bool:
         task = self._tasks.get(task_id)
         if not task:
             return False
-        if task.state in {"paused", "pending"}:
+        if task.state == DownloadState.PAUSED:
             worker = asyncio.create_task(self._run_download(task))
             self._workers[task_id] = worker
         return True
 
-    async def cancel(self, task_id: str) -> bool:
-        task = self._tasks.get(task_id)
-        if not task:
-            return False
-        task.state = "cancelled"
-        worker = self._workers.get(task_id)
-        if worker and not worker.done():
-            worker.cancel()
-            try:
-                await worker
-            except asyncio.CancelledError:
-                pass
-        return True
-
-    def list(self) -> List[DownloadTask]:
-        return list(self._tasks.values())
+    # TODO: Implement Download Cancel and add File Cleanup
+    # async def cancel(self, task_id: str) -> bool:
+    #     task = self._tasks.get(task_id)
+    #     if not task:
+    #         return False
+    #     task.state = DownloadState.PAUSED
+    #     worker = self._workers.get(task_id)
+    #     if worker and not worker.done():
+    #         worker.cancel()
+    #         try:
+    #             await worker
+    #         except asyncio.CancelledError:
+    #             pass
+    #     return True
 
 
-__all__ = ["DownloadManager", "DownloadTask"]
+
+__all__ = ["DownloadManager"]
