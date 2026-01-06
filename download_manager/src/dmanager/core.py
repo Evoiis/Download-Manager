@@ -16,6 +16,7 @@ import aiofiles
 
 @dataclass
 class DownloadEvent:
+    time: datetime
     task_id: int
     state: DownloadState
     error_string: Optional[str]
@@ -33,15 +34,15 @@ class DownloadMetadata:
     task_id: int
     url: str
     output_file: str
-    state: DownloadState = DownloadState.PAUSED
     etag: str
-    server_supports_http_range: bool = False
-    percent_completed: float = 0    # TODO: Logic
-    average_speed: float = 0 # MB/s    # TODO: Logic
     time_added: datetime    # TODO: Logic
     time_completed: datetime # TODO: Logic
-    completed: bool = False # TODO: Logic
     active_time: timedelta # TODO: Logic
+    percent_completed: float = 0    # TODO: Logic
+    average_speed: float = 0 # MB/s    # TODO: Logic
+    completed: bool = False # TODO: Logic
+    state: DownloadState = DownloadState.PAUSED
+    server_supports_http_range: bool = False
 
 
 class DownloadManager:
