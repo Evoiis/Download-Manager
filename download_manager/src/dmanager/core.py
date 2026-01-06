@@ -1,8 +1,8 @@
 from enum import Enum
 from dataclasses import dataclass
-from typing import Dict, Optional, List, Any
+from typing import Dict, Optional, Any
 from mimetypes import guess_extension
-from datetime import datetime
+from datetime import datetime, timedelta
 import os
 import asyncio
 import aiohttp
@@ -11,14 +11,13 @@ import aiofiles
 
 # TODO: Support default download folder
 
-# TODO: Define an Event Class
 @dataclass
 class DownloadEvent:
     task_id: int
     state: DownloadState
     error_string: Optional[str]
-    percent_completed: int
-    download_speed: float
+    percent_completed: float    # TODO: Logic
+    download_speed: float   # TODO: Logic
 
 class DownloadState(Enum):
     PAUSED = 0
@@ -34,6 +33,12 @@ class DownloadMetadata:
     state: DownloadState = DownloadState.PAUSED
     etag: str
     server_supports_http_range: bool = False
+    percent_completed: float = 0    # TODO: Logic
+    average_download_speed: float = 0 # MB/s    # TODO: Logic
+    time_added: datetime    # TODO: Logic
+    time_completed: datetime # TODO: Logic
+    completed: bool = False
+    active_time: timedelta
 
 
 class DownloadManager:
@@ -41,13 +46,18 @@ class DownloadManager:
     Async download manager using asyncio and aiohttp.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, chunk_write_size: int = 1) -> None:
+        """
+        :param chunk_write_size: How large of a chunk should the program write each time in MB
+        :type chunk_write_size: int
+        """
         # TODO Add clean up self._downloads logic
         self._downloads: Dict[int, DownloadMetadata] = {}
         self._next_id = 0
         self.events_queue: asyncio.Queue[Dict[str, Any]] = asyncio.Queue()
         # TODO make sure self._tasks are cleaned up
         self._tasks: Dict[int, asyncio.Task[Any]] = {}
+        self.chunk_write_size = chunk_write_size
 
     def _iterate_id(self) -> str:
         self._next_id += 1
@@ -72,6 +82,7 @@ class DownloadManager:
             return False
 
         self._tasks[task_id] = asyncio.create_task(self._download_file_coroutine(self._downloads[task_id]))
+        return True
 
     async def _download_file_coroutine(self, download: DownloadMetadata) -> None:
         output_file_size = os.path.getsize(download.output_file) if os.path.exists(download.output_file) else 0
@@ -99,7 +110,7 @@ class DownloadManager:
                 if "Accept-Ranges" in resp.headers:
                     download.server_supports_http_range = resp.headers["Accept-Ranges"] == "bytes"
                 
-                expected_file_size = int(resp.headers["Content-Length"]) if "Content-Length" in resp.headers else None     
+                expected_file_size = int(resp.headers["Content-Length"]) if "Content-Length" in resp.headers else None
 
         if expected_file_size is not None:
             if output_file_size >= expected_file_size:
@@ -118,26 +129,28 @@ class DownloadManager:
         session = aiohttp.ClientSession()
         try:
             download.state = DownloadState.RUNNING
-            await self.events_queue.put(
-                DownloadEvent(
-                    task_id=download.task_id,
-                    state=download.state
-                )
-            )
+            await self.events_queue.put(DownloadEvent(
+                task_id=download.task_id,
+                state=download.state
+            ))
 
             async with session.get(download.url, headers=headers) as resp:
-                # TODO parameterize chunk write size
-                async for chunk in resp.content.iter_chunked(64 * 1024):
+                async for chunk in resp.content.iter_chunked(self.chunk_write_size * 1024 * 1024):
                     try:
                         mode = "ab"
                         if resp.status == 200:
-                            # Server doesn't support partials
+                            # TODO: Still need this?
                             mode = "wb"
                         async with aiofiles.open(download.output_file, mode) as f:
                             await f.write(chunk)
-                    except Exception:
-                        # TODO: Handle Write Errors
-                        pass
+                    except Exception as err:
+                        download.state = DownloadState.ERROR
+                        await self.events_queue.put(DownloadEvent(
+                            task_id=download.task_id,
+                            state= download.state,
+                            error_string=str(err)
+                        ))
+                    # TODO: Update speed
 
             download.state = DownloadState.COMPLETED
             await self.events_queue.put(DownloadEvent(
