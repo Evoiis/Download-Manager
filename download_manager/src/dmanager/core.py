@@ -3,6 +3,8 @@ from dataclasses import dataclass
 from typing import Dict, Optional, Any
 from mimetypes import guess_extension
 from datetime import datetime, timedelta
+
+import logging
 import os
 import asyncio
 import aiohttp
@@ -10,6 +12,7 @@ import aiofiles
 
 
 # TODO: Support default download folder
+# TODO: Save data to file: Persist preferences and download_metadata between restarts
 
 @dataclass
 class DownloadEvent:
@@ -34,11 +37,11 @@ class DownloadMetadata:
     etag: str
     server_supports_http_range: bool = False
     percent_completed: float = 0    # TODO: Logic
-    average_download_speed: float = 0 # MB/s    # TODO: Logic
+    average_speed: float = 0 # MB/s    # TODO: Logic
     time_added: datetime    # TODO: Logic
     time_completed: datetime # TODO: Logic
-    completed: bool = False
-    active_time: timedelta
+    completed: bool = False # TODO: Logic
+    active_time: timedelta # TODO: Logic
 
 
 class DownloadManager:
@@ -158,7 +161,7 @@ class DownloadManager:
                 state= download.state
             ))
 
-            self._tasks.pop(download.task_id, None)
+            del self._tasks[download.task_id]
         except asyncio.CancelledError:
             download.state = DownloadState.PAUSED
             await self.events_queue.put(DownloadEvent(
@@ -184,14 +187,15 @@ class DownloadManager:
         if download.state != DownloadState.RUNNING:
             return False
 
-        task = self._tasks.get(task_id)
-        if task and not task.done():
+        if task_id not in self._tasks:
+            raise Exception("Error: task_id not in DownloadManager task list")
+        task = self._tasks[task_id]
+        if not task.done():
             task.cancel()
-            # TODO: I don't think we need to await here
-            # try:
-            #     await task
-            # except asyncio.CancelledError:
-            #     pass
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
         download.state = DownloadState.PAUSED
         await self.events_queue.put(
             DownloadEvent(
@@ -200,6 +204,24 @@ class DownloadManager:
             )
         )
         return True
+    
+    async def cancel_download(self, task_id: int, remove_file: bool = False) -> bool:
+        if task_id not in self._downloads:
+            logging.warning(f"DM.cancel_download called with task_id not found in DM._downloads")
+            return False
+
+        if self._downloads[task_id].state == DownloadState.RUNNING:
+            if not await self.pause_download(task_id):
+                raise Exception("Error: pause_download failed in cancel_download")
+            
+            del self._tasks[task_id]
+        
+        if remove_file:
+            os.remove(self._downloads[task_id].output_file)
+        del self._downloads[task_id]
+
+        return True
+
 
     # TODO: Implement Resume Download
     # async def resume_download(self, task_id: str) -> bool:
