@@ -34,13 +34,12 @@ class DownloadMetadata:
     task_id: int
     url: str
     output_file: str
-    # time_added: datetime    # TODO
-    # time_completed: datetime # TODO
-    # active_time: timedelta # TODO
-    # etag: str = None
+    # etag: str = None # TODO
     # percent_completed: float = 0    # TODO
     # average_speed: float = 0 # MB/s    # TODO
-    # completed: bool = False # TODO
+    active_time: timedelta = timedelta() # TODO
+    time_added: datetime = datetime.now()
+    time_completed: datetime = None # TODO
     state: DownloadState = DownloadState.PAUSED
     server_supports_http_range: bool = False
 
@@ -67,6 +66,14 @@ class DownloadManager:
     def _iterate_id(self) -> str:
         self._next_id += 1
         return self._next_id
+    
+    def get_downloads(self):
+        return self._downloads
+
+    async def get_latest_event(self) -> Optional[DownloadEvent]:
+        if self.events_queue.empty():
+            return None
+        return await self.events_queue.get()
 
     async def add_and_start_download(self, url: str, output_file: Optional[str] = "") -> int:
         id = self.add_download(url, output_file)
@@ -95,6 +102,7 @@ class DownloadManager:
         expected_file_size = None
 
         # TODO: Need to separate header checks into ON FIRST RUN and ON RESUME
+        # TODO: Verify ETag ON RESUME
         async with aiohttp.ClientSession() as session:
             async with session.head(download.url) as resp:
 
@@ -120,13 +128,14 @@ class DownloadManager:
         if expected_file_size is not None:
             if output_file_size >= expected_file_size:
                 # File already downloaded
+                download.state = DownloadState.COMPLETED
                 await self.events_queue.put(DownloadEvent(
                     task_id=download.task_id,
                     state=download.state
                 ))
                 return
 
-        # Actually download the file --------------------------------------------------------------------
+        # Download the file --------------------------------------------------------------------
         headers = {}
         if download.server_supports_http_range:
             headers["Range"] = f"bytes={output_file_size}-"

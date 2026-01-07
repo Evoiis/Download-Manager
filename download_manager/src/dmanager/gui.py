@@ -3,7 +3,6 @@ from src.dmanager.core import DownloadManager, DownloadEvent, DownloadState
 
 import tkinter as tk
 
-import asyncio
 
 class DownloadManagerGUI:
 
