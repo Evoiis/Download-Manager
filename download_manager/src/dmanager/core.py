@@ -27,6 +27,7 @@ class DownloadState(Enum):
     PAUSED = 0
     RUNNING = 1
     COMPLETED = 2
+    PENDING = 3
     ERROR = -1
 
 @dataclass
@@ -34,13 +35,14 @@ class DownloadMetadata:
     task_id: int
     url: str
     output_file: str
-    # etag: str = None # TODO
-    # percent_completed: float = 0    # TODO
+    etag: str = None # TODO
     # average_speed: float = 0 # MB/s    # TODO
-    active_time: timedelta = timedelta() # TODO
+    downloaded_bytes: int = 0
+    file_size_bytes: int = None
+    # active_time: timedelta = timedelta() # TODO
+    # time_completed: datetime = None # TODO
     time_added: datetime = datetime.now()
-    time_completed: datetime = None # TODO
-    state: DownloadState = DownloadState.PAUSED
+    state: DownloadState = DownloadState.PENDING
     server_supports_http_range: bool = False
 
 
@@ -63,11 +65,11 @@ class DownloadManager:
         self._tasks: Dict[int, asyncio.Task[Any]] = {}
         self.chunk_write_size = chunk_write_size
 
-    def _iterate_id(self) -> str:
+    def _iterate_and_get_id(self) -> str:
         self._next_id += 1
         return self._next_id
     
-    def get_downloads(self):
+    def get_downloads(self) -> Dict[int, DownloadMetadata]:
         return self._downloads
 
     async def get_latest_event(self) -> Optional[DownloadEvent]:
@@ -81,7 +83,7 @@ class DownloadManager:
         return id
 
     def add_download(self, url: str, output_file: Optional[str] = "") -> int:
-        id = self._iterate_id()
+        id = self._iterate_and_get_id()
         self._downloads[id] = DownloadMetadata(task_id=id, url=url, output_file=output_file)
         return id
 
@@ -93,52 +95,98 @@ class DownloadManager:
         if task_id not in self._downloads:
             return False
 
+        if self._downloads[task_id].state == DownloadState.RUNNING:
+            logging.warning(f"Received request to start, {task_id=}, but task is already running!")
+            return False
+
         self._tasks[task_id] = asyncio.create_task(self._download_file_coroutine(self._downloads[task_id]))
         return True
 
-    async def _download_file_coroutine(self, download: DownloadMetadata) -> None:
-        output_file_size = os.path.getsize(download.output_file) if os.path.exists(download.output_file) else 0
+    async def resume_download(self, task_id: int) -> bool:
+        if task_id not in self._downloads:
+            logging.warning(f"Received invalid {task_id=} in resume_download")
+            return False
 
-        expected_file_size = None
+        download = self._downloads[task_id]
 
-        # TODO: Need to separate header checks into ON FIRST RUN and ON RESUME
-        # TODO: Verify ETag ON RESUME
-        async with aiohttp.ClientSession() as session:
-            async with session.head(download.url) as resp:
+        if download.state == DownloadState.RUNNING or download.state == DownloadState.PENDING:
+            return False
+        
+        self._tasks[task_id] = asyncio.create_task(self._download_file_coroutine(self._downloads[task_id], resume=True))
 
-                if download.output_file == "":
+        return True
+    
+    async def _check_download_headers(self, download: DownloadMetadata, resume: bool=False) -> bool:
+        download_is_valid = True # 
+
+        if resume:
+            # Header checks on download resume
+            async with aiohttp.ClientSession() as session:
+                async with session.head(download.url) as resp:                    
                     if "Etag" in resp.headers:
-                        download.output_file = resp.headers["Etag"] + guess_extension(resp.headers.get("Content-Type", ".file"))
-                    else:
-                        download.output_file = datetime.now().strftime("%m_%d_%Y_%H_%M_%S")
-                        if "Content-Type" in resp.headers:
-                            guess_file_extension = guess_extension(resp.headers["Content-Type"])
-                            if guess_file_extension is None:
-                                download.output_file += ".file"
-                            else:
-                                download.output_file += guess_file_extension
-                        else:
-                            download.output_file += ".file"
-                
-                if "Accept-Ranges" in resp.headers:
-                    download.server_supports_http_range = resp.headers["Accept-Ranges"] == "bytes"
-                
-                expected_file_size = int(resp.headers["Content-Length"]) if "Content-Length" in resp.headers else None
+                        if resp.headers["Etag"] != download.etag:
+                            logging.info(f"Etag changed for {download.task_id=}, {download.url=}, {download.output_file=}. Restarting download from scratch.")
+                            download.etag = resp.headers["Etag"]
+                            download_is_valid = False
+                    if "Content-Type" in resp.headers:
+                        if download.file_size_bytes != resp.headers["Content-Type"]:
+                            logging.info(f"File size changed for {download.task_id=}, {download.url=}, {download.output_file=}. Restarting download from scratch.")
+                            download.file_size_bytes = resp.headers["Content-Type"]
+                            download_is_valid = False
 
-        if expected_file_size is not None:
-            if output_file_size >= expected_file_size:
-                # File already downloaded
+        else:
+            # Header checks on download first start
+            async with aiohttp.ClientSession() as session:
+                async with session.head(download.url) as resp:
+
+                    if download.output_file == "":
+                        if "Etag" in resp.headers:
+                            download.output_file = resp.headers["Etag"] + guess_extension(resp.headers.get("Content-Type", ".file"))
+                            download.etag = resp.headers["Etag"]
+                        else:
+                            download.output_file = datetime.now().strftime("%m_%d_%Y_%H_%M_%S")
+                            if "Content-Type" in resp.headers:
+                                guess_file_extension = guess_extension(resp.headers["Content-Type"])
+                                if guess_file_extension is None:
+                                    download.output_file += ".file"
+                                else:
+                                    download.output_file += guess_file_extension
+                            else:
+                                download.output_file += ".file"
+                    
+                    if "Accept-Ranges" in resp.headers:
+                        download.server_supports_http_range = resp.headers["Accept-Ranges"] == "bytes"
+                    
+                    download.file_size_bytes = int(resp.headers["Content-Length"]) if "Content-Length" in resp.headers else None
+        
+        return download_is_valid
+
+    async def _download_file_coroutine(self, download: DownloadMetadata, resume: bool=False) -> None:
+        download.downloaded_bytes = os.path.getsize(download.output_file) if os.path.exists(download.output_file) else 0
+
+        # Check if the file has already been completely downloaded
+        if download.file_size_bytes is not None:
+            if download.downloaded_bytes >= download.file_size_bytes:
                 download.state = DownloadState.COMPLETED
                 await self.events_queue.put(DownloadEvent(
                     task_id=download.task_id,
                     state=download.state
                 ))
+                del self._tasks[download.task_id]
                 return
+
+        # Get headers to collect/check metadata
+        if await self._check_download_headers(download, resume) is False:
+            # Download is no longer valid, restart from scratch
+            if os.path.exists(download.output_file):
+                os.remove(download.output_file)
+                download.downloaded_bytes = 0
+        
 
         # Download the file --------------------------------------------------------------------
         headers = {}
         if download.server_supports_http_range:
-            headers["Range"] = f"bytes={output_file_size}-"
+            headers["Range"] = f"bytes={download.downloaded_bytes}-"
 
         try:
             download.state = DownloadState.RUNNING
@@ -156,6 +204,7 @@ class DownloadManager:
                                 mode = "wb"
                             async with aiofiles.open(download.output_file, mode) as f:
                                 await f.write(chunk)
+                                download.downloaded_bytes += len(chunk)
                         except Exception as err:
                             download.state = DownloadState.ERROR
                             await self.events_queue.put(DownloadEvent(
@@ -206,6 +255,8 @@ class DownloadManager:
                 await task
             except asyncio.CancelledError:
                 pass
+
+            del self._tasks[task_id]
         download.state = DownloadState.PAUSED
         await self.events_queue.put(
             DownloadEvent(
@@ -231,33 +282,5 @@ class DownloadManager:
         del self._downloads[task_id]
 
         return True
-
-
-    # TODO: Implement Resume Download
-    # async def resume_download(self, task_id: str) -> bool:
-    #     task = self._downloads.get(task_id)
-    #     if not task:
-    #         return False
-    #     if task.state == DownloadState.PAUSED:
-    #         worker = asyncio.create_task(self._download_file_coroutine(task))
-    #         self._tasks[task_id] = worker
-    #     return True
-
-    # TODO: Implement Remove Download and add Optional File Cleanup
-    # async def cancel(self, task_id: str) -> bool:
-    #     task = self._downloads.get(task_id)
-    #     if not task:
-    #         return False
-    #     task.state = DownloadState.PAUSED
-    #     worker = self._tasks.get(task_id)
-    #     if worker and not worker.done():
-    #         worker.cancel()
-    #         try:
-    #             await worker
-    #         except asyncio.CancelledError:
-    #             pass
-    #     return True
-
-
 
 __all__ = ["DownloadManager", "DownloadMetadata", "DownloadState", "DownloadEvent"]
