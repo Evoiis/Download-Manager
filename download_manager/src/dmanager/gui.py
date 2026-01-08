@@ -18,10 +18,13 @@ class DownloadManagerGUI:
         self.root.destroy()
 
     def test_async(self):
+        task_id = self.dmanager.add_download(
+            "https://example.com/",
+            "test.txt"
+        )
         self.runner.submit(
-            self.dmanager.add_and_start_download(
-                "https://example.com/",
-                "test.txt"
+            self.dmanager.start_download(
+                task_id
             )
         )
 

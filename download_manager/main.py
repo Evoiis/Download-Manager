@@ -13,7 +13,8 @@ def main():
     gui = DownloadManagerGUI(dmanager, runner)
 
     gui.run_gui_loop()
-    pass
+
+    dmanager.shutdown()
 
 if __name__ == "__main__":
     main()

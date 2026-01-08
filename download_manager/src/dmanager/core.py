@@ -66,9 +66,14 @@ class DownloadManager:
         self._tasks: Dict[int, asyncio.Task[Any]] = {}
         self.chunk_write_size = chunk_write_size
 
-    def _iterate_and_get_id(self) -> str:
+    def _iterate_and_get_id(self) -> int:
         self._next_id += 1
         return self._next_id
+
+    def shutdown(self):
+        for task_id in self._tasks:
+            if not self._tasks[task_id].done():
+                self._tasks[task_id].cancel()
     
     def get_downloads(self) -> Dict[int, DownloadMetadata]:
         return self._downloads
@@ -302,15 +307,17 @@ class DownloadManager:
                 task_id=download.task_id,
                 state= download.state
             ))
-            raise asyncio.CancelledError()
+            raise
         except Exception as err:
-            # TODO: Should remove task from self._tasks?
             download.state = DownloadState.ERROR
             await self.events_queue.put(DownloadEvent(
                 task_id=download.task_id,
                 state= download.state,
                 error_string=str(err)
             ))
+        finally:
+            if download.task_id in self._tasks:
+                del self._tasks[download.task_id]
 
 
 __all__ = ["DownloadManager", "DownloadMetadata", "DownloadState", "DownloadEvent"]
