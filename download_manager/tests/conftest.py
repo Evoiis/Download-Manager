@@ -62,7 +62,6 @@ def mock_response():
 
     return factory
 
-
 @pytest.fixture
 def mock_session(monkeypatch):
     def factory(mock_url, mock_response):

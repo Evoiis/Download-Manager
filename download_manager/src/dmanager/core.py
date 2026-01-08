@@ -77,13 +77,10 @@ class DownloadManager:
             return None
         return await self.events_queue.get()
 
-    async def add_and_start_download(self, url: str, output_file: Optional[str] = "") -> int:
-        id = self.add_download(url, output_file)
-        await self.start_download(id)
-        return id
-
     def add_download(self, url: str, output_file: Optional[str] = "") -> int:
         id = self._iterate_and_get_id()
+        # TODO: Add error checks to check for invalid/clashing output file names
+        # URL validity check?
         self._downloads[id] = DownloadMetadata(task_id=id, url=url, output_file=output_file)
         return id
 
@@ -103,6 +100,10 @@ class DownloadManager:
         return True
 
     async def resume_download(self, task_id: int) -> bool:
+        """
+        Wraps download coroutine into task to resume download
+        """
+
         if task_id not in self._downloads:
             logging.warning(f"Received invalid {task_id=} in resume_download")
             return False
@@ -117,6 +118,15 @@ class DownloadManager:
         return True
     
     async def _check_download_headers(self, download: DownloadMetadata, resume: bool=False) -> bool:
+        """
+        Parses headers from server
+
+        First start:
+        - Collects ETag, Content-Length, Content-Type, Accept-Ranges to fill download metadata accordingly
+
+        On Resume:
+        - Verfies ETag and Content-Length still match download metadata
+        """
         download_is_valid = True # 
 
         if resume:
@@ -244,7 +254,10 @@ class DownloadManager:
 
     async def pause_download(self, task_id: int) -> bool:
         """
-        Docstring for pause_download
+        Pauses a download if it is running
+        Removes task from _tasks
+
+        :param task_id: Identifies which task to pause
         """
         if task_id not in self._downloads:
             return False
@@ -275,6 +288,11 @@ class DownloadManager:
         return True
     
     async def cancel_download(self, task_id: int, remove_file: bool = False) -> bool:
+        """
+        Removes download from _downloads and pauses the download if it is currently running
+
+        :param remove_file: Whether or not to delete the output file
+        """
         if task_id not in self._downloads:
             logging.warning(f"Download Manager cancel_download called with invalid task_id")
             return False

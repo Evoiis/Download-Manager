@@ -3,8 +3,6 @@ import pytest
 import os
 import logging
 
-
-
 @pytest.mark.asyncio
 async def test_add_and_start_download(async_thread_runner, mock_response, mock_session):
     from dmanager.core import DownloadManager, DownloadState
@@ -21,11 +19,11 @@ async def test_add_and_start_download(async_thread_runner, mock_response, mock_s
         })
     mock_session = mock_session(mock_url, mock_res)
 
-    logging.debug("Add download to dmanager")
+    logging.debug("Add and start download")
     dm = DownloadManager()
-    future = async_thread_runner.submit(dm.add_and_start_download(mock_url, mock_file_name))
+    task_id = dm.add_download(mock_url, mock_file_name)
+    async_thread_runner.submit(dm.start_download(task_id))
 
-    task_id = future.result(1)
     logging.debug(f"{task_id=}")
 
     received_running_event = False
