@@ -7,15 +7,14 @@ from dmanager.core import DownloadManager, DownloadState
 from tests.helpers import wait_for_state, verify_file
 
 @pytest.mark.asyncio
-async def test_add_and_start_download(async_thread_runner, create_mock_response_and_set_mock_session):
+async def test_add_and_start_download(async_thread_runner, create_mock_response_and_set_mock_session, test_file_setup_and_cleanup):
 
     logging.debug("Prepare mock session and response")
     chunks = [b"abc", b"def", b"ghi"]
     mock_url = "https://example.com/file.bin"
 
     mock_file_name = "test_file.bin"
-    if os.path.exists(mock_file_name):
-        os.remove(mock_file_name)
+    test_file_setup_and_cleanup(mock_file_name)
 
     mock_response = create_mock_response_and_set_mock_session(
         206,
@@ -70,18 +69,14 @@ async def test_add_and_start_download(async_thread_runner, create_mock_response_
 
     verify_file(mock_file_name, "abcdefghi")
 
-    logging.debug("Cleanup")
-    if os.path.exists(mock_file_name):
-        os.remove(mock_file_name)
-
 
 @pytest.mark.asyncio
-async def test_pause_download(async_thread_runner, create_mock_response_and_set_mock_session):
+async def test_pause_download(async_thread_runner, create_mock_response_and_set_mock_session, test_file_setup_and_cleanup):
     chunks = [b"abc", b"def", b"ghi"]
     mock_url = "https://example.com/file.bin"
     mock_file_name = "test_file.bin"
-    if os.path.exists(mock_file_name):
-        os.remove(mock_file_name)
+    test_file_setup_and_cleanup(mock_file_name)
+
     mock_response = create_mock_response_and_set_mock_session(
         206,
         {
@@ -126,18 +121,14 @@ async def test_pause_download(async_thread_runner, create_mock_response_and_set_
     logging.debug("Verifying only the first chunk was written to file")
     verify_file(mock_file_name, "abc")
 
-    logging.debug("Cleanup")
-    if os.path.exists(mock_file_name):
-        os.remove(mock_file_name)
-
 
 @pytest.mark.asyncio
-async def test_resume_download(async_thread_runner, create_mock_response_and_set_mock_session):
+async def test_resume_download(async_thread_runner, create_mock_response_and_set_mock_session, test_file_setup_and_cleanup):
     chunks = [b"abc", b"def", b"ghi"]
     mock_url = "https://example.com/file.bin"
     mock_file_name = "test_file.bin"
-    if os.path.exists(mock_file_name):
-        os.remove(mock_file_name)
+    test_file_setup_and_cleanup(mock_file_name)
+
     mock_response = create_mock_response_and_set_mock_session(
         206,
         {
@@ -186,11 +177,18 @@ async def test_resume_download(async_thread_runner, create_mock_response_and_set
     verify_file(mock_file_name, "abcghi")
 
 
-    # Cleanup
-    logging.debug("Cleanup")
-    if os.path.exists(mock_file_name):
-        os.remove(mock_file_name)
+@pytest.mark.asyncio
+async def test_delete_from_pending_state(async_thread_runner):
+    mock_url = "https://example.com/file.bin"
+    mock_file_name = "test_file.bin"
+    dm = DownloadManager()
+    task_id = dm.add_download(mock_url, mock_file_name)
 
+    assert task_id in dm.get_downloads()
+
+    await dm.delete_download(task_id, remove_file=False)
+
+    assert task_id not in dm.get_downloads()
 
 @pytest.mark.asyncio
 async def test_delete_from_running_state(async_thread_runner):
@@ -208,9 +206,6 @@ async def test_delete_from_error_state(async_thread_runner):
 async def test_delete_from_completed_state(async_thread_runner):
     pass
 
-@pytest.mark.asyncio
-async def test_delete_from_pending_state(async_thread_runner):
-    pass
 
 @pytest.mark.asyncio
 async def test_download_with_no_http_range_support():

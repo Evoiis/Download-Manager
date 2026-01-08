@@ -1,6 +1,7 @@
 import asyncio
 import pytest
-import time
+import os
+import logging
 
 from dmanager.asyncio_thread import AsyncioEventLoopThread
 
@@ -79,3 +80,21 @@ def create_mock_response_and_set_mock_session(monkeypatch):
         return mock_res
 
     return factory
+
+@pytest.fixture
+def test_file_setup_and_cleanup(request):
+    test_file_name = ""
+
+    def setup(file_name):
+        nonlocal test_file_name
+        test_file_name = file_name
+        if os.path.exists(test_file_name):
+            os.remove(test_file_name)
+
+    def cleanup():
+        if os.path.exists(test_file_name):
+            logging.debug(f"Cleaning up {test_file_name=}")
+            os.remove(test_file_name)
+    
+    request.addfinalizer(cleanup)
+    yield setup
