@@ -41,10 +41,10 @@ async def test_add_and_start_download(async_thread_runner, create_mock_response_
     download_metadata = dm.get_downloads()[task_id]
 
     logging.debug(download_metadata)
-    assert(download_metadata.url == mock_url)
-    assert(download_metadata.output_file == mock_file_name)
-    assert(download_metadata.file_size_bytes == 9)
-    assert(download_metadata.downloaded_bytes == 9)
+    assert download_metadata.url == mock_url
+    assert download_metadata.output_file == mock_file_name
+    assert download_metadata.file_size_bytes == 9
+    assert download_metadata.downloaded_bytes == 9
 
     verify_file(mock_file_name, "abcdefghi")
 
@@ -92,8 +92,8 @@ async def test_pause_download(async_thread_runner, create_mock_response_and_set_
     await asyncio.sleep(5)
     
     # Check _tasks is cleaned up and download state
-    assert(task_id not in dm._tasks)
-    assert(dm.get_downloads()[task_id].state == DownloadState.PAUSED)
+    assert task_id not in dm._tasks
+    assert dm.get_downloads()[task_id].state == DownloadState.PAUSED
 
     logging.debug("Verifying only the first chunk was written to file")
     verify_file(mock_file_name, "abc")
@@ -140,6 +140,7 @@ async def test_resume_download(async_thread_runner, create_mock_response_and_set
     # Task should be paused so we will give a chunk and wait some time to make sure pause stops file write
     await mock_response.insert_chunk(chunks[1])
     await asyncio.sleep(5)
+    await mock_response.empty_queue()
 
     logging.debug("Resume Download")
     async_thread_runner.submit(dm.resume_download(task_id))
@@ -147,6 +148,9 @@ async def test_resume_download(async_thread_runner, create_mock_response_and_set
     await wait_for_state(dm, task_id, DownloadState.RUNNING)
 
     await mock_response.insert_chunk(chunks[2])
+    mock_response.end_response()
+
+    await wait_for_state(dm, task_id, DownloadState.COMPLETED)
 
     # Verify
     verify_file(mock_file_name, "abcghi")

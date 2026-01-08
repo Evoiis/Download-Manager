@@ -34,6 +34,10 @@ class MockResponse:
     def end_response(self):
         self.stop = True
 
+    async def empty_queue(self):
+        while not self.queue.empty():
+            await self.queue.get()
+
 class MockSession:
     def __init__(self, responses):
         self._responses = responses

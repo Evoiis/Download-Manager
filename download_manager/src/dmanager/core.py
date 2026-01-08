@@ -4,6 +4,7 @@ from typing import Dict, Optional, Any
 from mimetypes import guess_extension
 from datetime import datetime, timedelta
 
+import re
 import logging
 import os
 import asyncio
@@ -91,6 +92,8 @@ class DownloadManager:
         id = self._iterate_and_get_id()
         # TODO: Add error checks to check for invalid/clashing output file names
         # URL validity check?
+
+        output_file = re.sub(r'[\\/:*?"<>|]', "", output_file).rstrip(" .")
         self._downloads[id] = DownloadMetadata(task_id=id, url=url, output_file=output_file)
         return id
 
@@ -122,7 +125,7 @@ class DownloadManager:
 
         if download.state not in [DownloadState.PAUSED, DownloadState.ERROR]:
             return False
-        if os.path.exists(download.output_file):
+        if download.state == DownloadState.ERROR and os.path.exists(download.output_file):
             os.remove(download.output_file)
         
         self._tasks[task_id] = asyncio.create_task(self._download_file_coroutine(self._downloads[task_id], resume=True))
@@ -155,13 +158,13 @@ class DownloadManager:
         
         if task_id in self._tasks:
             del self._tasks[task_id]
-        download.state = DownloadState.PAUSED
-        await self.events_queue.put(
-            DownloadEvent(
-                task_id=download.task_id,
-                state=download.state
-            )
-        )
+        # download.state = DownloadState.PAUSED
+        # await self.events_queue.put(
+        #     DownloadEvent(
+        #         task_id=download.task_id,
+        #         state=download.state
+        #     )
+        # )
         return True
 
     async def delete_download(self, task_id: int, remove_file: bool = False) -> bool:

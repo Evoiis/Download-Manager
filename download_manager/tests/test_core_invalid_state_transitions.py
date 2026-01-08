@@ -36,7 +36,7 @@ async def test_start_in_error_state(async_thread_runner, test_file_setup_and_cle
     logging.debug("Download is now in error state, now running start_download")
     future = async_thread_runner.submit(dm.start_download(task_id))
 
-    assert(future.result() is False, "start_download should have returned False")
+    assert future.result() is False, "start_download should have returned False"
 
     dm.shutdown()
 
@@ -72,7 +72,7 @@ async def test_start_in_running_state(async_thread_runner, test_file_setup_and_c
 
     future = async_thread_runner.submit(dm.start_download(task_id))
 
-    assert(future.result() is False, "start_download should have returned False")
+    assert future.result() is False, "start_download should have returned False"
 
     dm.shutdown()    
 
@@ -109,7 +109,7 @@ async def test_start_in_completed_state(async_thread_runner, test_file_setup_and
     await wait_for_state(dm, task_id, DownloadState.COMPLETED)
 
     future = async_thread_runner.submit(dm.start_download(task_id))
-    assert(future.result() is False, "start_download should have returned False")
+    assert future.result() is False, "start_download should have returned False"
 
     dm.shutdown()
 
@@ -151,7 +151,7 @@ async def test_start_in_paused_state(async_thread_runner, test_file_setup_and_cl
 
     future = async_thread_runner.submit(dm.start_download(task_id))
 
-    assert(future.result() is False, "start_download should have returned False")
+    assert future.result() is False, "start_download should have returned False"
 
     dm.shutdown()
 # TEST_RESUME ------------------------------------------------------------
@@ -187,7 +187,7 @@ async def test_resume_in_running_state(async_thread_runner, test_file_setup_and_
     wait_for_file_to_be_created(mock_file_name)
 
     future = async_thread_runner.submit(dm.resume_download(task_id))    
-    assert(future.result() is False, "resume_download should have returned False")
+    assert future.result() is False, "resume_download should have returned False"
 
     dm.shutdown()
 
@@ -214,7 +214,7 @@ async def test_resume_in_pending_state(async_thread_runner, test_file_setup_and_
     task_id = dm.add_download(mock_url, mock_file_name)
 
     future = async_thread_runner.submit(dm.resume_download(task_id))    
-    assert(future.result() is False, "resume_download should have returned False")
+    assert future.result() is False, "resume_download should have returned False"
 
     dm.shutdown()
 
@@ -251,7 +251,7 @@ async def test_resume_completed_download(async_thread_runner, test_file_setup_an
     await wait_for_state(dm, task_id, DownloadState.COMPLETED)
 
     future = async_thread_runner.submit(dm.resume_download(task_id))    
-    assert(future.result() is False, "resume_download should have returned False")
+    assert future.result() is False, "resume_download should have returned False"
 
     dm.shutdown()
 
@@ -290,7 +290,7 @@ async def test_pause_completed_download(async_thread_runner, test_file_setup_and
     await wait_for_state(dm, task_id, DownloadState.COMPLETED)
 
     future = async_thread_runner.submit(dm.pause_download(task_id))
-    assert(future.result() is False, "pause_download should have returned False")
+    assert future.result() is False, "pause_download should have returned False"
 
     dm.shutdown()
 
@@ -331,7 +331,7 @@ async def test_pause_in_paused_state(async_thread_runner, test_file_setup_and_cl
     await wait_for_state(dm, task_id, DownloadState.PAUSED)
 
     future = async_thread_runner.submit(dm.pause_download(task_id))
-    assert(future.result() is False, "pause_download should have returned False")
+    assert future.result() is False, "pause_download should have returned False"
 
     dm.shutdown()
 
@@ -358,7 +358,7 @@ async def test_pause_in_pending_state(async_thread_runner, test_file_setup_and_c
     task_id = dm.add_download(mock_url, mock_file_name)
 
     future = async_thread_runner.submit(dm.pause_download(task_id))
-    assert(future.result() is False, "pause_download should have returned False")
+    assert future.result() is False, "pause_download should have returned False"
 
     dm.shutdown()
 
@@ -390,7 +390,7 @@ async def test_pause_in_error_state(async_thread_runner, create_mock_response_an
     logging.debug("Download is now in error state, now running pause_download")
 
     future = async_thread_runner.submit(dm.pause_download(task_id))
-    assert(future.result() is False, "pause_download should have returned False")
+    assert future.result() is False, "pause_download should have returned False"
 
     dm.shutdown()
 
