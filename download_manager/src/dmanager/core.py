@@ -13,16 +13,22 @@ import aiofiles
 
 
 # TODO: Support default download folder
-# TODO: Save data to file: Persist preferences and download_metadata between restarts
+# TODO: Support parallel downloads
+# TODO: Save metadata to file: Persist preferences and download_metadata between restarts
 
 @dataclass
 class DownloadEvent:
     task_id: int
     state: DownloadState
+    output_file: str
     percent_completed: float = None
     download_speed: float = None
     error_string: Optional[str] = ""
-    time: datetime = datetime.now()
+    time: datetime = 0
+
+    def __post_init__(self):
+        self.time = datetime.now()
+
 
 class DownloadState(Enum):
     PAUSED = 0
@@ -58,11 +64,9 @@ class DownloadManager:
         :type chunk_write_size: int
         """
 
-        # TODO Add clean up self._downloads logic
         self._downloads: Dict[int, DownloadMetadata] = {}
         self._next_id = 0
         self.events_queue: asyncio.Queue[Dict[str, Any]] = asyncio.Queue()
-        # TODO make sure self._tasks are cleaned up
         self._tasks: Dict[int, asyncio.Task[Any]] = {}
         self.chunk_write_size = chunk_write_size
 
@@ -173,13 +177,6 @@ class DownloadManager:
         
         if task_id in self._tasks:
             del self._tasks[task_id]
-        # download.state = DownloadState.PAUSED
-        # await self.events_queue.put(
-        #     DownloadEvent(
-        #         task_id=download.task_id,
-        #         state=download.state
-        #     )
-        # )
         return True
 
     async def delete_download(self, task_id: int, remove_file: bool = False) -> bool:
@@ -206,7 +203,8 @@ class DownloadManager:
         await self.events_queue.put(
             DownloadEvent(
                 task_id=task_id,
-                state=DownloadState.DELETED
+                state=DownloadState.DELETED,
+                output_file=None
             )
         )
 
@@ -270,6 +268,7 @@ class DownloadManager:
             await self.events_queue.put(DownloadEvent(
                 task_id=download.task_id,
                 state=download.state,
+                output_file=download.output_file,
                 error_string=str(err)
             ))
             return False
@@ -285,12 +284,12 @@ class DownloadManager:
                 download.state = DownloadState.COMPLETED
                 await self.events_queue.put(DownloadEvent(
                     task_id=download.task_id,
-                    state=download.state
+                    state=download.state,
+                    output_file=download.output_file
                 ))
                 del self._tasks[download.task_id]
                 return
             elif download.downloaded_bytes > download.file_size_bytes:
-                # TODO
                 raise Exception("Downloaded bytes > expected file size")        
 
         # Download the file --------------------------------------------------------------------
@@ -301,9 +300,11 @@ class DownloadManager:
         download.state = DownloadState.RUNNING
         await self.events_queue.put(DownloadEvent(
             task_id=download.task_id,
-            state=download.state
+            state=download.state,
+            output_file=download.output_file
         ))
 
+        last_running_update = datetime.now()
         try:
             async with aiohttp.ClientSession() as session:
                 async with session.get(download.url, headers=headers) as resp:
@@ -318,23 +319,27 @@ class DownloadManager:
                             time_delta = datetime.now() - start
                             download.downloaded_bytes += len(chunk)                            
                             download.active_time += time_delta
-
-                            percent_completed = None
-                            if download.file_size_bytes is not None:
-                                percent_completed = download.downloaded_bytes / download.file_size_bytes * 100
-                                logging.debug(f"{download.downloaded_bytes=}")
-                            await self.events_queue.put(DownloadEvent(
-                                task_id=download.task_id,
-                                state=download.state,
-                                percent_completed=percent_completed,
-                                download_speed=len(chunk)/time_delta.total_seconds()
-                            ))
+                            
+                            if datetime.now() - last_running_update > timedelta(seconds=2):
+                                last_running_update = datetime.now()
+                                percent_completed = None
+                                if download.file_size_bytes is not None:
+                                    percent_completed = download.downloaded_bytes / download.file_size_bytes * 100
+                                    logging.debug(f"{download.downloaded_bytes=}")
+                                await self.events_queue.put(DownloadEvent(
+                                    task_id=download.task_id,
+                                    state=download.state,
+                                    output_file=download.output_file,
+                                    percent_completed=percent_completed,
+                                    download_speed=len(chunk)/time_delta.total_seconds()
+                                ))
 
             download.time_completed = datetime.now()
             download.state = DownloadState.COMPLETED
             await self.events_queue.put(DownloadEvent(
                 task_id=download.task_id,
-                state= download.state
+                state= download.state,
+                output_file=download.output_file
             ))
 
             del self._tasks[download.task_id]
@@ -342,7 +347,8 @@ class DownloadManager:
             download.state = DownloadState.PAUSED
             await self.events_queue.put(DownloadEvent(
                 task_id=download.task_id,
-                state= download.state
+                state= download.state,
+                output_file=download.output_file
             ))
             raise
         except Exception as err:
@@ -351,7 +357,8 @@ class DownloadManager:
             await self.events_queue.put(DownloadEvent(
                 task_id=download.task_id,
                 state= download.state,
-                error_string=str(err)
+                error_string=str(err),
+                output_file=download.output_file
             ))
         finally:
             if download.task_id in self._tasks:
