@@ -362,8 +362,41 @@ async def test_resume_in_error_state(async_thread_runner, test_file_setup_and_cl
     await mock_response.insert_chunk(b"This is a valid chunk!")
     mock_response.end_response()
 
-    await wait_for_state(dm, task_id, DownloadState.COMPLETED)    
+    await wait_for_state(dm, task_id, DownloadState.COMPLETED)
 
     verify_file(mock_file_name, "This is a valid chunk!")
 
     dm.shutdown()
+@pytest.mark.asyncio
+async def test_start_in_error_state(async_thread_runner, test_file_setup_and_cleanup, create_mock_response_and_set_mock_session):
+    chunks = ["invalid chunk because a bytes-like object is required :)"]
+    mock_url = "https://example.com/file.bin"
+    mock_file_name = "test_file.bin"
+    test_file_setup_and_cleanup(mock_file_name)
+
+    mock_response = create_mock_response_and_set_mock_session(
+        206,
+        {
+            "Content-Length": str(sum(len(c) for c in chunks)),
+            "Accept-Ranges": "bytes"
+        },
+        mock_url
+    )
+
+    dm = DownloadManager()
+    task_id = dm.add_download(mock_url, mock_file_name)
+    async_thread_runner.submit(dm.start_download(task_id))
+
+    await mock_response.insert_chunk(chunks[0])
+    
+    await wait_for_state(dm, task_id, DownloadState.RUNNING)
+    await wait_for_state(dm, task_id, DownloadState.ERROR)
+
+    logging.debug("Download is now in error state, now running start_download")
+    future = async_thread_runner.submit(dm.start_download(task_id))
+
+    assert future.result()
+    await wait_for_state(dm, task_id, DownloadState.RUNNING)
+
+    dm.shutdown()
+
