@@ -400,3 +400,67 @@ async def test_start_in_error_state(async_thread_runner, test_file_setup_and_cle
 
     dm.shutdown()
 
+
+@pytest.mark.asyncio
+async def test_two_mb_download(async_thread_runner, test_file_setup_and_cleanup, create_mock_response_and_set_mock_session):
+    two_mb = b"a" * (2 * 1024 * 1024)
+    mock_url = "https://example.com/file.bin"
+    mock_file_name = "test_file.bin"
+    test_file_setup_and_cleanup(mock_file_name)
+
+    mock_response = create_mock_response_and_set_mock_session(
+        206,
+        {
+            "Content-Length": len(two_mb),
+            "Accept-Ranges": "bytes"
+        },
+        mock_url
+    )
+
+    dm = DownloadManager()
+    task_id = dm.add_download(mock_url, mock_file_name)
+    async_thread_runner.submit(dm.start_download(task_id))
+
+    await mock_response.insert_chunk(two_mb)
+    mock_response.end_response()
+    
+    await wait_for_state(dm, task_id, DownloadState.RUNNING)
+    wait_for_file_to_be_created(mock_file_name)
+    await wait_for_state(dm, task_id, DownloadState.COMPLETED)
+
+    verify_file(mock_file_name, "a" * (2 * 1024 * 1024))
+
+    dm.shutdown()
+
+
+
+
+@pytest.mark.asyncio
+async def test_two_mb_download_no_http_ranges(async_thread_runner, test_file_setup_and_cleanup, create_mock_response_and_set_mock_session):
+    two_mb = b"a" * (2 * 1024 * 1024)
+    mock_url = "https://example.com/file.bin"
+    mock_file_name = "test_file.bin"
+    test_file_setup_and_cleanup(mock_file_name)
+
+    mock_response = create_mock_response_and_set_mock_session(
+        200,
+        {
+            "Content-Length": len(two_mb),
+        },
+        mock_url
+    )
+
+    dm = DownloadManager()
+    task_id = dm.add_download(mock_url, mock_file_name)
+    future = async_thread_runner.submit(dm.start_download(task_id))
+
+    await mock_response.insert_chunk(two_mb)
+    mock_response.end_response()
+    
+    await wait_for_state(dm, task_id, DownloadState.RUNNING)
+    wait_for_file_to_be_created(mock_file_name)
+    await wait_for_state(dm, task_id, DownloadState.COMPLETED)
+
+    verify_file(mock_file_name, "a" * (2 * 1024 * 1024))
+
+    dm.shutdown()

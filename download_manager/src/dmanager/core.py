@@ -19,8 +19,8 @@ import aiofiles
 class DownloadEvent:
     task_id: int
     state: DownloadState
-    # percent_completed: float    # TODO: Logic
-    # download_speed: float   # TODO: Logic
+    percent_completed: float = None
+    download_speed: float = None
     error_string: Optional[str] = ""
     time: datetime = datetime.now()
 
@@ -38,11 +38,10 @@ class DownloadMetadata:
     url: str
     output_file: str
     etag: str = None
-    # average_speed: float = 0 # MB/s    # TODO
     downloaded_bytes: int = 0
     file_size_bytes: int = None
-    # active_time: timedelta = timedelta() # TODO
-    # time_completed: datetime = None # TODO
+    active_time: timedelta = timedelta()
+    time_completed: datetime = None
     time_added: datetime = datetime.now()
     state: DownloadState = DownloadState.PENDING
     server_supports_http_range: bool = False
@@ -303,19 +302,35 @@ class DownloadManager:
             task_id=download.task_id,
             state=download.state
         ))
+
         try:
             async with aiohttp.ClientSession() as session:
                 async with session.get(download.url, headers=headers) as resp:
                     async for chunk in resp.content.iter_chunked(self.chunk_write_size * 1024 * 1024):
+                        start = datetime.now()
                         mode = "ab"
                         if resp.status == 200:
                             mode = "wb"
                         async with aiofiles.open(download.output_file, mode) as f:
                             await f.write(chunk)
-                            download.downloaded_bytes += len(chunk)
-                            
-                        # TODO: Update speed
+                            logging.info(f"{len(chunk)=}")
 
+                            time_delta = datetime.now() - start
+                            download.downloaded_bytes += len(chunk)                            
+                            download.active_time += time_delta
+
+                            percent_completed = None
+                            if download.file_size_bytes is not None:
+                                percent_completed = download.downloaded_bytes / download.file_size_bytes * 100
+                                logging.info(f"{download.downloaded_bytes=}")
+                            await self.events_queue.put(DownloadEvent(
+                                task_id=download.task_id,
+                                state=download.state,
+                                percent_completed=percent_completed,
+                                download_speed=len(chunk)/time_delta.total_seconds()
+                            ))
+
+            download.time_completed = datetime.now()
             download.state = DownloadState.COMPLETED
             await self.events_queue.put(DownloadEvent(
                 task_id=download.task_id,
