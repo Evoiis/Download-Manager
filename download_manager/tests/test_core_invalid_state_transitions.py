@@ -1,6 +1,4 @@
-import asyncio
 import pytest
-import os
 import logging
 
 from dmanager.core import DownloadManager, DownloadState
