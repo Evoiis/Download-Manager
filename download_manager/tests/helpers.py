@@ -27,7 +27,6 @@ def wait_for_file_to_be_created(file_name, timeout_sec=DEFAULT_TIMEOUT):
             return
     raise AssertionError(f"Timed out while waiting for {file_name=} to be created")
 
-
 def verify_file(file_name, expected_string):
     with open(file_name) as f:
         file_text = f.read()

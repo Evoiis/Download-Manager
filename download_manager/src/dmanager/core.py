@@ -229,9 +229,9 @@ class DownloadManager:
                 async with aiohttp.ClientSession() as session:
                     async with session.head(download.url) as resp:                    
                         if "ETag" in resp.headers:
-                            if resp.headers["ETag"] != download.etag:
+                            if resp.headers["ETag"][1:-1] != download.etag:
                                 logging.info(f"Etag changed for {download.task_id=}, {download.url=}, {download.output_file=}. Restarting download from scratch.")
-                                download.etag = resp.headers["ETag"]
+                                download.etag = resp.headers["ETag"][1:-1]
                                 if os.path.exists(download.output_file):
                                     os.remove(download.output_file)
                                     download.downloaded_bytes = 0
@@ -247,10 +247,10 @@ class DownloadManager:
                 async with aiohttp.ClientSession() as session:
                     async with session.head(download.url) as resp:
                         if "ETag" in resp.headers:
-                                download.etag = resp.headers["ETag"]
+                                download.etag = resp.headers["ETag"][1:-1]
                         if download.output_file == "":
                             if "ETag" in resp.headers:
-                                download.output_file = resp.headers["ETag"] + guess_extension(resp.headers.get("Content-Type", ".file"))
+                                download.output_file = resp.headers["ETag"][1:-1] + guess_extension(resp.headers.get("Content-Type", ".file"))
                             else:
                                 download.output_file = datetime.now().strftime("%m_%d_%Y_%H_%M_%S")
                                 if "Content-Type" in resp.headers:
@@ -273,6 +273,7 @@ class DownloadManager:
                 error_string=str(err)
             ))
             return False
+
         return True
 
     async def _download_file_coroutine(self, download: DownloadMetadata) -> None:
@@ -313,7 +314,6 @@ class DownloadManager:
                             mode = "wb"
                         async with aiofiles.open(download.output_file, mode) as f:
                             await f.write(chunk)
-                            logging.info(f"{len(chunk)=}")
 
                             time_delta = datetime.now() - start
                             download.downloaded_bytes += len(chunk)                            
@@ -322,7 +322,7 @@ class DownloadManager:
                             percent_completed = None
                             if download.file_size_bytes is not None:
                                 percent_completed = download.downloaded_bytes / download.file_size_bytes * 100
-                                logging.info(f"{download.downloaded_bytes=}")
+                                logging.debug(f"{download.downloaded_bytes=}")
                             await self.events_queue.put(DownloadEvent(
                                 task_id=download.task_id,
                                 state=download.state,
