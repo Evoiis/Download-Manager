@@ -9,10 +9,10 @@ A simple python download manager for windows.
 - Asynchronous downloads using aioHTTP
 - Download controls: Start/Resume/Pausing/Delete
 - Test Suite
+- Simple TKinter GUI to add, control, and check progress of downloads
 
 
 ### Planned:
-- Simple TKinter GUI to add, control, and check progress of downloads
 - Parallel downloads for large files
     - And new test for parallel downloads
 - Save metadata to file: Persist preferences and download_metadata between restarts

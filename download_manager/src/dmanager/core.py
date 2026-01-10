@@ -23,9 +23,11 @@ class DownloadEvent:
     output_file: str
     time: datetime = 0
     error_string: Optional[str] = ""
-    percent_completed: float = None
     download_speed: float = None
     active_time: timedelta = None
+    downloaded_bytes: int = None
+    download_size_bytes: int = None
+
 
     def __post_init__(self):
         self.time = datetime.now()
@@ -162,7 +164,7 @@ class DownloadManager:
         """
         logging.debug("pause_download called")
         if task_id not in self._downloads:
-            logging.warning("Pause download called with invalid task_id")
+            logging.warning(f"Pause download called with invalid {task_id=}")
             return False
         
         download = self._downloads[task_id]
@@ -192,7 +194,7 @@ class DownloadManager:
         """
         logging.debug("delete_download called")
         if task_id not in self._downloads:
-            logging.warning(f"Download Manager delete_download called with invalid task_id")
+            logging.warning(f"Download Manager delete_download called with invalid {task_id=}")
             return False
 
         if self._downloads[task_id].state == DownloadState.RUNNING:
@@ -291,8 +293,7 @@ class DownloadManager:
                 await self.events_queue.put(DownloadEvent(
                     task_id=download.task_id,
                     state=download.state,
-                    output_file=download.output_file,
-                    percent_completed=100
+                    output_file=download.output_file
                 ))
                 del self._tasks[download.task_id]
                 return
@@ -304,7 +305,7 @@ class DownloadManager:
                     error_string="There is already a downloaded file with the same name that is larger than expected.",
                     output_file=download.output_file
                 ))
-                raise Exception("Downloaded bytes > expected file size")        
+                raise Exception("Downloaded bytes > expected file size")
 
         # Download the file --------------------------------------------------------------------
         headers = {}
@@ -339,16 +340,14 @@ class DownloadManager:
                             
                             if (datetime.now() - last_running_update) > self.running_event_update_rate_seconds:
                                 last_running_update = datetime.now()
-                                percent_completed = None
-                                if download.file_size_bytes is not None:
-                                    percent_completed = download.downloaded_bytes / download.file_size_bytes * 100
                                 await self.events_queue.put(DownloadEvent(
                                     task_id=download.task_id,
                                     state=download.state,
                                     output_file=download.output_file,
-                                    percent_completed=percent_completed,
                                     download_speed=len(chunk)/chunk_time_delta.total_seconds(),
-                                    active_time=download.active_time
+                                    active_time=download.active_time,
+                                    downloaded_bytes=download.downloaded_bytes,
+                                    download_size_bytes=download.file_size_bytes
                                 ))
 
             download.time_completed = datetime.now()
@@ -357,9 +356,10 @@ class DownloadManager:
                 task_id=download.task_id,
                 state= download.state,
                 output_file=download.output_file,
-                percent_completed=100,
                 download_speed=0,
-                active_time=download.active_time
+                active_time=download.active_time,
+                downloaded_bytes=download.downloaded_bytes,
+                download_size_bytes=download.file_size_bytes
             ))
 
             del self._tasks[download.task_id]
