@@ -112,7 +112,7 @@ class DownloadManager:
         """
         Wraps download coroutine into task to start the download
         """
-
+        logging.debug("start_download called")
         if task_id not in self._downloads:
             return False
 
@@ -134,7 +134,7 @@ class DownloadManager:
         """
         Wraps download coroutine into task to resume download
         """
-
+        logging.debug("resume_download called")
         if task_id not in self._downloads:
             logging.warning(f"Received invalid {task_id=} in resume_download")
             return False
@@ -160,11 +160,14 @@ class DownloadManager:
 
         :param task_id: Identifies which task to pause
         """
+        logging.debug("pause_download called")
         if task_id not in self._downloads:
+            logging.warning("Pause download called with invalid task_id")
             return False
         
         download = self._downloads[task_id]
         if download.state != DownloadState.RUNNING:
+            logging.warning("Pause download called on non-running task")
             return False
 
         if task_id not in self._tasks:
@@ -187,6 +190,7 @@ class DownloadManager:
 
         :param remove_file: Whether or not to delete the output file
         """
+        logging.debug("delete_download called")
         if task_id not in self._downloads:
             logging.warning(f"Download Manager delete_download called with invalid task_id")
             return False
@@ -230,14 +234,14 @@ class DownloadManager:
                     async with session.head(download.url) as resp:                    
                         if "ETag" in resp.headers:
                             if resp.headers["ETag"][1:-1] != download.etag:
-                                logging.info(f"Etag changed for {download.task_id=}, {download.url=}, {download.output_file=}. Restarting download from scratch.")
+                                logging.debug(f"Etag changed for {download.task_id=}, {download.url=}, {download.output_file=}. Restarting download from scratch.")
                                 download.etag = resp.headers["ETag"][1:-1]
                                 if os.path.exists(download.output_file):
                                     os.remove(download.output_file)
                                     download.downloaded_bytes = 0
                         if "Content-Length" in resp.headers:
                             if download.file_size_bytes != int(resp.headers["Content-Length"]):
-                                logging.info(f"File size changed for {download.task_id=}, {download.url=}, {download.output_file=}. Restarting download from scratch.")
+                                logging.debug(f"File size changed for {download.task_id=}, {download.url=}, {download.output_file=}. Restarting download from scratch.")
                                 download.file_size_bytes = resp.headers["Content-Length"]
                                 if os.path.exists(download.output_file):
                                     os.remove(download.output_file)
@@ -293,6 +297,13 @@ class DownloadManager:
                 del self._tasks[download.task_id]
                 return
             elif download.downloaded_bytes > download.file_size_bytes:
+                download.state = DownloadState.ERROR
+                await self.events_queue.put(DownloadEvent(
+                    task_id=download.task_id,
+                    state= download.state,
+                    error_string="There is already a downloaded file with the same name that is larger than expected.",
+                    output_file=download.output_file
+                ))
                 raise Exception("Downloaded bytes > expected file size")        
 
         # Download the file --------------------------------------------------------------------
@@ -331,7 +342,6 @@ class DownloadManager:
                                 percent_completed = None
                                 if download.file_size_bytes is not None:
                                     percent_completed = download.downloaded_bytes / download.file_size_bytes * 100
-                                    logging.debug(f"{download.downloaded_bytes=}")
                                 await self.events_queue.put(DownloadEvent(
                                     task_id=download.task_id,
                                     state=download.state,

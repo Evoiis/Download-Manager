@@ -59,7 +59,7 @@ async def test_empty_output_file_name(test_file_setup_and_cleanup, async_thread_
         {
             "Content-Length": str(sum(len(c) for c in chunks)),
             "Accept-Ranges": "bytes",
-            "ETag": "ETAGSTRING",
+            "ETag": '"ETAGSTRING"',
             "Content-Type": "video/mp4"
         },
         mock_url

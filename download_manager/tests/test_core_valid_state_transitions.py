@@ -200,7 +200,6 @@ async def test_delete_from_running_state(async_thread_runner, test_file_setup_an
     logging.debug("Download is running, now run delete_download")
     future = async_thread_runner.submit(dm.delete_download(task_id, remove_file=False))
     future.result()
-    # await dm.delete_download(task_id, remove_file=False)
 
     await wait_for_state(dm, task_id, DownloadState.DELETED)
 
@@ -236,6 +235,8 @@ async def test_delete_from_paused_state(async_thread_runner, test_file_setup_and
 
     logging.debug("Pause download")
     async_thread_runner.submit(dm.pause_download(task_id))
+
+    await wait_for_state(dm, task_id, DownloadState.PAUSED)
 
     logging.debug("Download is paused, now run delete_download")
     await dm.delete_download(task_id, remove_file=False)
