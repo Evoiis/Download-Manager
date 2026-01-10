@@ -148,7 +148,7 @@ class DownloadManager:
         if download.state == DownloadState.ERROR:
             await self.start_download(task_id)
         else:
-            if await self._check_download_headers(download, resume=True) is False:
+            if await self._check_download_headers(download) is False:
                 return False
                 
             self._tasks[task_id] = asyncio.create_task(self._download_file_coroutine(self._downloads[task_id]))
@@ -218,58 +218,55 @@ class DownloadManager:
 
         return True
 
-    async def _check_download_headers(self, download: DownloadMetadata, resume: bool=False) -> bool:
+    async def _check_download_headers(self, download: DownloadMetadata) -> bool:
         """
         Parses headers from server
 
-        First start:
         - Collects ETag, Content-Length, Content-Type, Accept-Ranges to fill download metadata accordingly
 
-        On Resume:
         - Verifies ETag and Content-Length still match download metadata
             - Deletes already downloaded data if they no longer match the response from the server
         """
+
         try:
-            if resume:
-                # Header checks on download resume
-                async with aiohttp.ClientSession() as session:
-                    async with session.head(download.url) as resp:                    
-                        if "ETag" in resp.headers:
-                            if resp.headers["ETag"][1:-1] != download.etag:
-                                logging.debug(f"Etag changed for {download.task_id=}, {download.url=}, {download.output_file=}. Restarting download from scratch.")
-                                download.etag = resp.headers["ETag"][1:-1]
-                                if os.path.exists(download.output_file):
-                                    os.remove(download.output_file)
-                                    download.downloaded_bytes = 0
-                        if "Content-Length" in resp.headers:
-                            if download.file_size_bytes != int(resp.headers["Content-Length"]):
-                                logging.debug(f"File size changed for {download.task_id=}, {download.url=}, {download.output_file=}. Restarting download from scratch.")
-                                download.file_size_bytes = resp.headers["Content-Length"]
-                                if os.path.exists(download.output_file):
-                                    os.remove(download.output_file)
-                                    download.downloaded_bytes = 0
-            else:
-                # Header checks on download first start
-                async with aiohttp.ClientSession() as session:
-                    async with session.head(download.url) as resp:
-                        if "ETag" in resp.headers:
-                                download.etag = resp.headers["ETag"][1:-1]
-                        if download.output_file == "":
-                            if "ETag" in resp.headers:
-                                download.output_file = resp.headers["ETag"][1:-1] + guess_extension(resp.headers.get("Content-Type", ".file"))
-                            else:
-                                download.output_file = datetime.now().strftime("%m_%d_%Y_%H_%M_%S")
-                                if "Content-Type" in resp.headers:
-                                    guess_file_extension = guess_extension(resp.headers["Content-Type"])
-                                    if guess_file_extension is None:
-                                        download.output_file += ".file"
-                                    else:
-                                        download.output_file += guess_file_extension
-                                else:
-                                    download.output_file += ".file"
-                        if "Accept-Ranges" in resp.headers:
+            async with aiohttp.ClientSession() as session:
+                async with session.head(download.url) as resp:
+                    if "ETag" in resp.headers:
+                        if download.etag ==None:
+                            download.etag = resp.headers["ETag"][1:-1]
+                        elif resp.headers["ETag"][1:-1] != download.etag:
+                            logging.debug(f"Etag changed for {download.task_id=}, {download.url=}, {download.output_file=}. Restarting download from scratch.")
+                            download.etag = resp.headers["ETag"][1:-1]
+                            if os.path.exists(download.output_file):
+                                os.remove(download.output_file)
+                                download.downloaded_bytes = 0
+
+                    if "Content-Length" in resp.headers:
+                        if download.file_size_bytes is None:
+                            download.file_size_bytes = int(resp.headers["Content-Length"])
+                        elif download.file_size_bytes != int(resp.headers["Content-Length"]):
+                            logging.debug(f"File size changed for {download.task_id=}, {download.url=}, {download.output_file=}. Restarting download from scratch.")
+                            download.file_size_bytes = resp.headers["Content-Length"]
+                            if os.path.exists(download.output_file):
+                                os.remove(download.output_file)
+                                download.downloaded_bytes = 0
+
+                    if "Accept-Ranges" in resp.headers:
                             download.server_supports_http_range = resp.headers["Accept-Ranges"] == "bytes"
-                        download.file_size_bytes = int(resp.headers["Content-Length"]) if "Content-Length" in resp.headers else None
+                    
+                    if download.output_file == "":
+                        if "ETag" in resp.headers:
+                            download.output_file = resp.headers["ETag"][1:-1] + guess_extension(resp.headers.get("Content-Type", ".file"))
+                        else:
+                            download.output_file = datetime.now().strftime("%m_%d_%Y_%H_%M_%S")
+                            if "Content-Type" in resp.headers:
+                                guess_file_extension = guess_extension(resp.headers["Content-Type"])
+                                if guess_file_extension is None:
+                                    download.output_file += ".file"
+                                else:
+                                    download.output_file += guess_file_extension
+                            else:
+                                download.output_file += ".file"
         except Exception as err:
             logging.error(err)
             download.state = DownloadState.ERROR
