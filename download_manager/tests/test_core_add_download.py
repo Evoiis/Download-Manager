@@ -48,11 +48,10 @@ async def test_output_file_with_invalid_characters():
 
 @pytest.mark.asyncio
 async def test_empty_output_file_name(test_file_setup_and_cleanup, async_thread_runner, create_mock_response_and_set_mock_session):
-    logging.debug("Prepare mock session and response")
     chunks = [b"abc", b"def", b"ghi"]
     mock_url = "https://example.com/file.bin"
 
-    # test_file_setup_and_cleanup("")
+    test_file_setup_and_cleanup("ETAGSTRING.mp4")
 
     create_mock_response_and_set_mock_session(
         206,
@@ -79,7 +78,6 @@ async def test_empty_output_file_name(test_file_setup_and_cleanup, async_thread_
 
 @pytest.mark.asyncio
 async def test_input_invalid_url(async_thread_runner):
-    logging.debug("Prepare mock session and response")
     invalid_url = "http://exa mple.com"
     # mock_file_name = "test_file.bin"
     # test_file_setup_and_cleanup(mock_file_name)

@@ -73,7 +73,6 @@ class MockParallelResponse():
         while not self.stop:
             if not self.request_queue.empty():
                 data_range_request = await self.request_queue.get()
-                logging.warning(f"{data_range_request=}")
                 yield self.data[data_range_request]
                 break
             else:
