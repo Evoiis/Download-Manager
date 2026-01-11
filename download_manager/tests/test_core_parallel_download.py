@@ -6,10 +6,15 @@ import logging
 from dmanager.core import DownloadManager, DownloadState
 from tests.helpers import wait_for_state, verify_file, wait_for_file_to_be_created
 
+
+@pytest.mark.parametrize(
+    "n_workers",
+    [1, 5]
+)
 @pytest.mark.asyncio
-async def test_parallel_download_coroutine(async_thread_runner, create_parallel_mock_response_and_set_mock_session, test_file_setup_and_cleanup):
-    # TODO Single Worker test
-    dm = DownloadManager(maximum_workers_per_task=1)
+async def test_n_worker_parallel_download_coroutine(async_thread_runner, create_parallel_mock_response_and_set_mock_session, test_file_setup_and_cleanup, n_workers):
+    logging.info(f"Running with {n_workers=}")
+    dm = DownloadManager(maximum_workers_per_task=n_workers)
 
     mock_url = "https://example.com/file.txt"
     mock_file_name = "test_file.txt"
@@ -23,7 +28,7 @@ async def test_parallel_download_coroutine(async_thread_runner, create_parallel_
         "bytes=75-100": b"asdfeasdfeasdfeasdfeasdfe"
     }
 
-    mock_response = create_parallel_mock_response_and_set_mock_session(
+    create_parallel_mock_response_and_set_mock_session(
         206,
         {
             "Content-Length": 100,
@@ -37,9 +42,8 @@ async def test_parallel_download_coroutine(async_thread_runner, create_parallel_
     task_id = dm.add_download(mock_url, mock_file_name)
 
     async_thread_runner.submit(dm.start_download(task_id, use_parallel_download=True)) 
-
-    wait_for_file_to_be_created(mock_file_name, 20)
-
+    
+    await wait_for_state(dm, task_id, DownloadState.ALLOCATING_SPACE)
     await wait_for_state(dm, task_id, DownloadState.COMPLETED)
 
     verify_file(

@@ -135,7 +135,6 @@ class DownloadManager:
         if not self._session:
             self._session = aiohttp.ClientSession()
 
-        logging.info("start_download called")
         if task_id not in self._downloads:
             return False
 
@@ -159,7 +158,7 @@ class DownloadManager:
             download.use_parallel_download = False
         
 
-        logging.info(f"Task {task_id}, {download.use_parallel_download=}")
+        logging.debug(f"Task {task_id}, {download.use_parallel_download=}")
 
         if download.use_parallel_download:
             async with aiofiles.open(download.output_file, "wb") as f:
@@ -387,7 +386,7 @@ class DownloadManager:
 
         n_workers = min(self.maximum_workers_per_task, download.data_queue.qsize())
 
-        logging.info(f"Starting {n_workers=}")
+        logging.debug(f"Starting {n_workers=}")
         try:
             for n in range(n_workers):
                 self._task_pools[download.task_id].append(
@@ -407,10 +406,11 @@ class DownloadManager:
             ))
 
     async def _parallel_download_coroutine(self, download: DownloadMetadata, worker_id) -> None:
-        logging.info(f"Task {download.task_id}, Worker {worker_id} initialized.")
+        logging.debug(f"Task {download.task_id}, Worker {worker_id} initialized.")
         while True:
             try:
                 start_bytes, end_bytes = download.data_queue.get_nowait()
+                logging.debug(f"Worker {worker_id} picked up download range ({start_bytes}, {end_bytes})")
                 next_write_byte = start_bytes
                 
                 headers = {
