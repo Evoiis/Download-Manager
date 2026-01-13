@@ -15,8 +15,6 @@ A simple python download manager for windows.
 ### Planned:
 
 1. Finish parallel download tasks
-# TODO: main.py logger lvl CLI options
-# TODO: Parallel download pipeline needs to check if file is downloaded before allocating space
 # TODO: Get rid of resume_download and replace with start_downlaod
 # TODO: Parallel downloads support resume download
 

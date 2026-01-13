@@ -176,6 +176,8 @@ class DownloadManager:
         # Initialize async tasks
         if download.use_parallel_download:
             # Pre-allocate file on disk
+            if await self._check_if_complete_file_on_disk(download):
+                return False
             try:
                 async with aiofiles.open(download.output_file, "wb") as f:
                     download.state = DownloadState.ALLOCATING_SPACE
@@ -365,15 +367,15 @@ class DownloadManager:
                 ))
                 del self._tasks[download.task_id]
                 return True
-            elif download.downloaded_bytes > download.file_size_bytes:
+            elif download.downloaded_bytes != download.file_size_bytes:
                 download.state = DownloadState.ERROR
                 await self.events_queue.put(DownloadEvent(
                     task_id=download.task_id,
                     state= download.state,
-                    error_string="There is already a downloaded file with the same name that is larger than expected.",
+                    error_string="There is already a downloaded file with the same name with a different size!",
                     output_file=download.output_file
                 ))
-                raise Exception("Downloaded bytes > expected file size")
+                return False
         
         return False
 
