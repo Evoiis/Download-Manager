@@ -148,11 +148,12 @@ class DownloadManager:
             self._session = aiohttp.ClientSession()
 
         if task_id not in self._downloads:
+            logging.warning(f"Start Download: {task_id=} not found.")
             return False
 
         download = self._downloads[task_id]
         if download.state not in [DownloadState.PENDING, DownloadState.ERROR, DownloadState.PAUSED]:
-            logging.warning(f"Received invalid request to start, {task_id=}. Task is in invalid state to be started.")
+            logging.warning(f"Received invalid request to start, {task_id=}. Task is in invalid state to be started/restarted.")
             return False
 
         if download.state == DownloadState.ERROR:
@@ -177,7 +178,8 @@ class DownloadManager:
         if download.use_parallel_download:
             # Pre-allocate file on disk
             if await self._check_if_complete_file_on_disk(download):
-                return False
+                if download.task_id in self._data_queues and self._data_queues[download.task_id].empty():
+                    return False
             try:
                 async with aiofiles.open(download.output_file, "wb") as f:
                     download.state = DownloadState.ALLOCATING_SPACE
@@ -197,35 +199,36 @@ class DownloadManager:
             self._tasks[task_id] = asyncio.create_task(self._download_file_coroutine(download))
         return True
 
-    # TODO: get rid of resume_download and just call start
+
     async def resume_download(self, task_id: int) -> bool:
         """
         Wraps download coroutine into task to resume download
         """
-        logging.debug("resume_download called")
-        if task_id not in self._downloads:
-            logging.warning(f"Received invalid {task_id=} in resume_download")
-            return False
+        return await self.start_download(task_id)
 
-        download = self._downloads[task_id]
+        # if task_id not in self._downloads:
+        #     logging.warning(f"Received invalid {task_id=} in resume_download")
+        #     return False
 
-        if download.state not in [DownloadState.PAUSED, DownloadState.ERROR]:
-            return False
-        if download.state == DownloadState.ERROR:
-            return await self.start_download(task_id)
-        else:            
-            try:
-                await self._check_download_headers(download)
-            except Exception as err:
-                await self._log_and_share_error_event(download, err)
-                return False
+        # download = self._downloads[task_id]
 
-            if await self._check_if_complete_file_on_disk(download):
-                return False
+        # if download.state not in [DownloadState.PAUSED, DownloadState.ERROR]:
+        #     return False
+        # if download.state == DownloadState.ERROR:
+        #     return await self.start_download(task_id)
+        # else:            
+        #     try:
+        #         await self._check_download_headers(download)
+        #     except Exception as err:
+        #         await self._log_and_share_error_event(download, err)
+        #         return False
 
-            self._tasks[task_id] = asyncio.create_task(self._download_file_coroutine(self._downloads[task_id]))
+        #     if await self._check_if_complete_file_on_disk(download):
+        #         return False
 
-        return True
+        #     self._tasks[task_id] = asyncio.create_task(self._download_file_coroutine(self._downloads[task_id]))
+
+        # return True
 
     async def pause_download(self, task_id: int) -> bool:
         """
@@ -234,42 +237,50 @@ class DownloadManager:
 
         :param task_id: Identifies which task to pause
         """
-        logging.debug("[DM] pause_download called")
-        if task_id not in self._downloads:
-            logging.warning(f"Pause download called with invalid {task_id=}")
-            return False
-        
-        download = self._downloads[task_id]
-        if download.state != DownloadState.RUNNING:
-            logging.warning("Pause download called on non-running task")
-            return False
+        try:
+            logging.debug("[DM] pause_download called")
+            if task_id not in self._downloads:
+                logging.warning(f"Pause download called with invalid {task_id=}")
+                return False
+            
+            download = self._downloads[task_id]
+            if download.state != DownloadState.RUNNING:
+                logging.warning("Pause download called on non-running task")
+                return False
 
-        if download.use_parallel_download:
-            if task_id not in self._task_pools:
-                raise Exception("Error: task_id not in DownloadManager task pool list")
-            task_pool = self._task_pools[task_id]
-            for task in task_pool:
+            logging.debug("[DM] pause_download after initial checks")
+            if download.use_parallel_download:
+                logging.debug(f"[DM] pause_download in parallel download, {self._task_pools=}")
+                if task_id not in self._task_pools:
+                    return False
+                    # raise Exception("Error: task_id not in DownloadManager task pool list")
+                logging.debug(f"Attempting to stop tasks in {self._task_pools[task_id]}")
+                task_pool = self._task_pools[task_id]
+                for task in task_pool:
+                    if not task.done():
+                        try:
+                            await task
+                        except asyncio.CancelledError:
+                            pass
+                    
+                del self._task_pools[download.task_id]
+            else:
+                logging.debug("[DM] pause_download in single connection download")
+                if task_id not in self._tasks:
+                    raise Exception("Error: task_id not in DownloadManager task list")
+                task = self._tasks[task_id]
                 if not task.done():
+                    task.cancel()
                     try:
                         await task
                     except asyncio.CancelledError:
                         pass
                 
-            del self._task_pools[download.task_id]
-        else:
-            if task_id not in self._tasks:
-                raise Exception("Error: task_id not in DownloadManager task list")
-            task = self._tasks[task_id]
-            if not task.done():
-                task.cancel()
-                try:
-                    await task
-                except asyncio.CancelledError:
-                    pass
-            
-            if task_id in self._tasks:
-                del self._tasks[task_id]
-        return True
+                if task_id in self._tasks:
+                    del self._tasks[task_id]
+            return True
+        except Exception as err:
+            await self._log_and_share_error_event(download, err)
 
     async def delete_download(self, task_id: int, remove_file: bool = False) -> bool:
         """

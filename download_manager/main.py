@@ -13,7 +13,8 @@ def main():
 
     if args.debug:
         logging.getLogger().setLevel(logging.DEBUG)
-    logging.getLogger().setLevel(logging.INFO)
+    else:
+        logging.getLogger().setLevel(logging.INFO)
     runner = AsyncioEventLoopThread()
     dmanager = DownloadManager()
 
