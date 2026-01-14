@@ -219,6 +219,7 @@ class DownloadManager:
             await self._log_and_share_error_event(download, err)
 
     async def _run_single_connection_download(self, download:DownloadMetadata):
+        download.downloaded_bytes = os.path.getsize(download.output_file) if os.path.exists(download.output_file) else 0
         if await self._check_if_complete_file_on_disk(download):
             download.state = DownloadState.COMPLETED
             await self.events_queue.put(DownloadEvent(
@@ -298,34 +299,44 @@ class DownloadManager:
 
         :param remove_file: Whether or not to delete the output file
         """
-        logging.debug("delete_download called")
-        if task_id not in self._downloads:
-            logging.warning(f"Download Manager delete_download called with invalid {task_id=}")
-            return False
+        try:
+            logging.debug("delete_download called")
+            if task_id not in self._downloads:
+                logging.warning(f"Download Manager delete_download called with invalid {task_id=}")
+                return False
 
-        if self._downloads[task_id].state == DownloadState.RUNNING:
-            if not await self.pause_download(task_id):
-                raise Exception("Error: pause_download failed in delete_download")
-        
-        if task_id in self._tasks:
-            del self._tasks[task_id]
-        
-        if remove_file:
-            if os.path.exists(self._downloads[task_id].output_file):
-                os.remove(self._downloads[task_id].output_file)
-        
-        if task_id in self._downloads:
-            del self._downloads[task_id]
+            download = self._downloads[task_id]
+            if self._downloads[task_id].state == DownloadState.RUNNING:
+                if not await self.pause_download(task_id):
+                    raise Exception("Error: pause_download failed in delete_download")
+            
+            if task_id in self._tasks:
+                del self._tasks[task_id]
 
-        await self.events_queue.put(
-            DownloadEvent(
-                task_id=task_id,
-                state=DownloadState.DELETED,
-                output_file=None
+            if task_id in self._task_pools:
+                del self._task_pools[task_id]
+            
+            if remove_file:
+                if os.path.exists(self._downloads[task_id].output_file):
+                    os.remove(self._downloads[task_id].output_file)
+            
+            if task_id in self._downloads:
+                del self._downloads[task_id]
+
+            await self.events_queue.put(
+                DownloadEvent(
+                    task_id=task_id,
+                    state=DownloadState.DELETED,
+                    output_file=None
+                )
             )
-        )
 
-        return True
+            return True
+        except Exception as err:
+            tb = traceback.format_exc()
+            logging.error(f"Traceback: {tb}")
+            self._log_and_share_error_event(download, err)
+
 
     async def _check_download_headers(self, download: DownloadMetadata):
         """
@@ -374,8 +385,6 @@ class DownloadManager:
                             download.output_file += guess_file_extension
                     else:
                         download.output_file += ".file"
-
-        download.downloaded_bytes = os.path.getsize(download.output_file) if os.path.exists(download.output_file) else 0
     
     async def _check_if_complete_file_on_disk(self, download: DownloadMetadata):
         if download.file_size_bytes is not None:
@@ -398,21 +407,21 @@ class DownloadManager:
     async def _create_task_pool(self, download: DownloadMetadata):
         task_id = download.task_id
         self._task_pools[task_id] = []
-        self._data_queues[task_id] = asyncio.Queue()
 
-        prev_bytes = None
-
-        if download.file_size_bytes is None or download.file_size_bytes == 0:
-            raise Exception("Parallel download requires Content-Length header")
-        if download.file_size_bytes < ONE_GIBIB:
-            increment = int(download.file_size_bytes // 4)
-        else:
-            increment = int(download.file_size_bytes // (download.file_size_bytes // (ONE_GIBIB/2)))
-        
-        for end_bytes in range(0, download.file_size_bytes + 1, increment):
-            if prev_bytes is not None:
-                await self._data_queues[task_id].put((prev_bytes, end_bytes))
-            prev_bytes = end_bytes
+        if task_id not in self._data_queues:
+            self._data_queues[task_id] = asyncio.Queue()
+            prev_bytes = None
+            if download.file_size_bytes is None or download.file_size_bytes == 0:
+                raise Exception("Parallel download requires Content-Length header")
+            if download.file_size_bytes < ONE_GIBIB:
+                increment = int(download.file_size_bytes // 4)
+            else:
+                increment = int(download.file_size_bytes // (download.file_size_bytes // (ONE_GIBIB/2)))
+            
+            for end_bytes in range(0, download.file_size_bytes + 1, increment):
+                if prev_bytes is not None:
+                    await self._data_queues[task_id].put((prev_bytes, end_bytes))
+                prev_bytes = end_bytes
 
         n_workers = max(min(self._maximum_workers_per_task, self._data_queues[task_id].qsize()), self._minimum_workers_per_task)
 
@@ -489,7 +498,8 @@ class DownloadManager:
                     task_id=download.task_id,
                     state= download.state,
                     output_file=download.output_file,
-                    worker_id=worker_id
+                    worker_id=worker_id,
+                    active_time=active_time
                 ))
                 raise
             except asyncio.QueueEmpty:
@@ -521,7 +531,8 @@ class DownloadManager:
                     state= download.state,
                     error_string=f"{repr(err)}, {err}",
                     output_file=download.output_file,
-                    worker_id=worker_id
+                    worker_id=worker_id,
+                    active_time=active_time
                 ))
                 return
         

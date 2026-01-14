@@ -110,9 +110,9 @@ class MockParallelResponse():
 
 
 class MockParallelSession:
-    def __init__(self, responses, request_queue):
+    def __init__(self, responses, request_queues):
         self._responses = responses
-        self.request_queue = request_queue
+        self.request_queues = request_queues
 
     async def __aenter__(self):
         return self
@@ -121,7 +121,7 @@ class MockParallelSession:
         pass
 
     def get(self, url, headers=None):   
-        self.request_queue.put_nowait(headers["Range"])
+        self.request_queues[url].put_nowait(headers["Range"])
         return self._responses[url]
 
     def head(self, url):
@@ -150,10 +150,30 @@ def create_mock_response_and_set_mock_session(monkeypatch):
 @pytest.fixture
 def create_parallel_mock_response_and_set_mock_session(monkeypatch):
 
-    def factory(return_status, headers, mock_url, request_queue, range_ends, data):
+    def factory(return_status, headers, mock_url, range_ends, data):
+        request_queue = asyncio.Queue()
         mock_response = MockParallelResponse(return_status, request_queue, headers, range_ends, data)
-        monkeypatch.setattr("aiohttp.ClientSession", lambda: MockParallelSession({mock_url: mock_response}, request_queue))
+        monkeypatch.setattr("aiohttp.ClientSession", lambda: MockParallelSession({mock_url: mock_response}, {mock_url: request_queue}))
         return mock_response
+    
+    return factory
+
+@pytest.fixture
+def create_multiple_parallel_mock_response_and_mock_sessions(monkeypatch):
+
+    def factory(mock_response_args: dict):
+        mock_url_to_mock_responses = dict()
+        mock_url_to_request_queue = dict()
+
+        for url in mock_response_args:
+            mock_url_to_request_queue[url] = asyncio.Queue()
+            new_mock_response = MockParallelResponse(request_queue=mock_url_to_request_queue[url], **mock_response_args[url])
+            mock_url_to_mock_responses[url] = new_mock_response
+        
+        mps = MockParallelSession(mock_url_to_mock_responses, mock_url_to_request_queue)
+
+        monkeypatch.setattr("aiohttp.ClientSession", lambda: mps)
+        return mock_url_to_mock_responses
     
     return factory
 
@@ -174,3 +194,25 @@ def test_file_setup_and_cleanup(request):
     
     request.addfinalizer(cleanup)
     yield setup
+
+
+@pytest.fixture
+def test_multiple_file_setup_and_cleanup(request):
+    test_files = []
+
+    def setup(files):
+        nonlocal test_files
+        test_files = files
+        for file in test_files:
+            if os.path.exists(file):
+                os.remove(file)
+
+    def cleanup():
+        for file in test_files:
+            if os.path.exists(file):
+                logging.debug(f"Cleaning up {file=}")
+                os.remove(file)
+    
+    request.addfinalizer(cleanup)
+    yield setup
+
