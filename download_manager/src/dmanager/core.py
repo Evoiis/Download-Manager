@@ -29,7 +29,7 @@ class DownloadState(Enum):
     PENDING = 3
     DELETED = 4
     ALLOCATING_SPACE = 5
-    ERROR = -1
+    ERROR = 6
 
 
 @dataclass
@@ -69,7 +69,9 @@ class DownloadManager:
     Async download manager using asyncio and aiohttp.
     """
 
-    def __init__(self, running_event_update_rate_seconds: int = 1, parallel_running_event_update_rate_seconds: int = 0.5, maximum_workers_per_task: int = 5) -> None:
+    def __init__(self, running_event_update_rate_seconds: int = 1, parallel_running_event_update_rate_seconds: int = 0.5, maximum_workers_per_task: int = 5, minimum_workers_per_task: int = 1) -> None:
+        assert minimum_workers_per_task > 0
+
         self._downloads: Dict[int, DownloadMetadata] = {}
         self._next_id = 0
         self.events_queue: asyncio.Queue[Dict[str, Any]] = asyncio.Queue()
@@ -81,6 +83,7 @@ class DownloadManager:
         self._running_event_update_rate_seconds = timedelta(seconds=running_event_update_rate_seconds)
         self._parallel_running_event_update_rate_seconds = timedelta(seconds=parallel_running_event_update_rate_seconds)
         self._maximum_workers_per_task = maximum_workers_per_task
+        self._minimum_workers_per_task = minimum_workers_per_task
 
     def _iterate_and_get_id(self) -> int:
         self._next_id += 1
@@ -184,14 +187,15 @@ class DownloadManager:
                 if download.task_id in self._data_queues and self._data_queues[download.task_id].empty():
                     return False
             try:
-                async with aiofiles.open(download.output_file, "wb") as f:
-                    download.state = DownloadState.ALLOCATING_SPACE
-                    await self.events_queue.put(DownloadEvent(
-                        task_id=task_id,
-                        state=download.state,
-                        output_file=None
-                    ))
-                    await f.truncate(download.file_size_bytes)
+                if download.task_id not in self._data_queues:
+                    async with aiofiles.open(download.output_file, "wb") as f:
+                        download.state = DownloadState.ALLOCATING_SPACE
+                        await self.events_queue.put(DownloadEvent(
+                            task_id=task_id,
+                            state=download.state,
+                            output_file=None
+                        ))
+                        await f.truncate(download.file_size_bytes)
 
                 await self._create_task_pool(download)
             except Exception as err:
@@ -393,7 +397,7 @@ class DownloadManager:
                 await self._data_queues[task_id].put((prev_bytes, end_bytes))
             prev_bytes = end_bytes
 
-        n_workers = min(self._maximum_workers_per_task, self._data_queues[task_id].qsize())
+        n_workers = max(min(self._maximum_workers_per_task, self._data_queues[task_id].qsize()), self._minimum_workers_per_task)
 
         logging.debug(f"{self._data_queues[task_id]=}")
 
@@ -512,6 +516,7 @@ class DownloadManager:
             if download.server_supports_http_range:
                 headers["Range"] = f"bytes={download.downloaded_bytes}-"
             
+            # TODO Get rid of this running event update
             download.state = DownloadState.RUNNING
             await self.events_queue.put(DownloadEvent(
                 task_id=download.task_id,

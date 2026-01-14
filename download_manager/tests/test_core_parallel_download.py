@@ -36,7 +36,8 @@ async def test_n_worker_parallel_download_coroutine(async_thread_runner, create_
         },
         mock_url,
         request_queue,
-        data
+        data,
+        True
     )
     
     task_id = dm.add_download(mock_url, mock_file_name)
@@ -52,6 +53,50 @@ async def test_n_worker_parallel_download_coroutine(async_thread_runner, create_
         mock_file_name,
         "".join(x.decode('ascii') for x in data.values())
     )
+    
+    await dm.shutdown()
+
+
+@pytest.mark.asyncio
+async def test_parallel_download_pause(async_thread_runner, create_parallel_mock_response_and_set_mock_session, test_file_setup_and_cleanup):
+    n_workers = 4
+    dm = DownloadManager(maximum_workers_per_task=n_workers, minimum_workers_per_task=n_workers)
+
+    mock_url = "https://example.com/file.txt"
+    mock_file_name = "test_file.txt"
+    test_file_setup_and_cleanup(mock_file_name)
+
+    request_queue = asyncio.Queue()
+    data = {
+        "bytes=0-25": b"abcdeabcdeabcdeabcdeabcde",
+        "bytes=25-50": b"ghijkghijkghijkghijkghijk",
+        "bytes=50-75": b"mnopqmnopqmnopqmnopqmnopq",
+        "bytes=75-100": b"asdfeasdfeasdfeasdfeasdfe"
+    }
+
+    create_parallel_mock_response_and_set_mock_session(
+        206,
+        {
+            "Content-Length": 100,
+            "Accept-Ranges": "bytes"
+        },
+        mock_url,
+        request_queue,
+        data,
+        False
+    )
+    
+    task_id = dm.add_download(mock_url, mock_file_name)
+
+    async_thread_runner.submit(dm.start_download(task_id, use_parallel_download=True)) 
+    
+    await wait_for_state(dm, task_id, DownloadState.ALLOCATING_SPACE)
+    await wait_for_state(dm, task_id, DownloadState.RUNNING)
+
+    async_thread_runner.submit(dm.pause_download(task_id)) 
+
+    for _ in range(n_workers):
+        await wait_for_state(dm, task_id, DownloadState.PAUSED)
     
     await dm.shutdown()
 

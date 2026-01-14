@@ -60,13 +60,14 @@ class MockSession:
 
 
 class MockParallelResponse():
-    def __init__(self, status, data: dict, request_queue: asyncio.Queue, headers={}):
+    def __init__(self, status, data: dict, request_queue: asyncio.Queue, headers: dict, auto_break: bool):
         self.status = status
         self.headers = headers
         self.content = self
         self.request_queue = request_queue
         self.stop = False
         self.data = data
+        self.auto_break = auto_break
 
     async def __aenter__(self):
         return self
@@ -79,7 +80,8 @@ class MockParallelResponse():
             if not self.request_queue.empty():
                 data_range_request = await self.request_queue.get()
                 yield self.data[data_range_request]
-                break
+                if self.auto_break:
+                    break
             else:
                 await asyncio.sleep(0.5)
 
@@ -132,8 +134,8 @@ def create_mock_response_and_set_mock_session(monkeypatch):
 @pytest.fixture
 def create_parallel_mock_response_and_set_mock_session(monkeypatch):
 
-    def factory(return_status, headers, mock_url, request_queue, data):
-        mock_response = MockParallelResponse(return_status, data, request_queue, headers)
+    def factory(return_status, headers, mock_url, request_queue, data, auto_break):
+        mock_response = MockParallelResponse(return_status, data, request_queue, headers, auto_break)
         monkeypatch.setattr("aiohttp.ClientSession", lambda: MockParallelSession({mock_url: mock_response}, request_queue))
         return mock_response
     
