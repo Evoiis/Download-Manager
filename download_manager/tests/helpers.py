@@ -3,7 +3,7 @@ import time
 import os
 import logging
 
-from typing import Dict
+from typing import Dict, Tuple
 
 from dmanager.core import DownloadState
 
@@ -23,7 +23,7 @@ async def wait_for_state(dm, task_id, expected_state, timeout_sec=DEFAULT_TIMEOU
             await asyncio.sleep(1)
     raise AssertionError(f"Timed out while waiting for {task_id=} to reach {expected_state}.")
 
-async def wait_for_multiple_states(dm, states: Dict[(int, DownloadState), int], timeout_sec=DEFAULT_TIMEOUT):
+async def wait_for_multiple_states(dm, states: Dict[Tuple[int, DownloadState], int], timeout_sec=DEFAULT_TIMEOUT):
     for _ in range(timeout_sec):
         event = await dm.get_oldest_event()
         if event:
