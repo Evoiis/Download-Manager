@@ -196,7 +196,7 @@ class DownloadManagerGUI:
 
         if column == "#9":
             task_id = self.table.item(row, "values")[0]
-            self.runner.submit(self.dmanager.resume_download(int(task_id)))
+            self.runner.submit(self.dmanager.start_download(int(task_id)))
         elif column == "#10":
             task_id = self.table.item(row, "values")[0]
             self.runner.submit(self.dmanager.pause_download(int(task_id)))

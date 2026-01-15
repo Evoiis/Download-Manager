@@ -41,7 +41,7 @@ async def test_header_etag_change(async_thread_runner, test_file_setup_and_clean
 
     mock_response.headers["ETag"] = '"2"'
 
-    async_thread_runner.submit(dm.resume_download(task_id))
+    async_thread_runner.submit(dm.start_download(task_id))
 
     await mock_response.insert_chunk(chunks[1])
     await mock_response.insert_chunk(chunks[2])
@@ -90,7 +90,7 @@ async def test_resume_on_header_content_length_change(async_thread_runner, test_
 
     mock_response.headers["Content-Length"] = 3
 
-    async_thread_runner.submit(dm.resume_download(task_id))
+    async_thread_runner.submit(dm.start_download(task_id))
 
     await mock_response.insert_chunk(chunks[1])
     await mock_response.insert_chunk(chunks[2])
@@ -165,7 +165,7 @@ async def test_resume_on_download_with_no_http_range_support(async_thread_runner
     logging.debug("Wait for dm to emit download pause state")
     await wait_for_state(dm, task_id, DownloadState.PAUSED)
     
-    async_thread_runner.submit(dm.resume_download(task_id))
+    async_thread_runner.submit(dm.start_download(task_id))
 
     await mock_response.insert_chunk(chunks[0])
     mock_response.end_response()

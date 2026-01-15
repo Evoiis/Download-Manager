@@ -122,18 +122,13 @@ async def test_input_already_used_output_file():
 
 @pytest.mark.asyncio
 async def test_invalid_test_id(async_thread_runner):
-    # chunks = ["invalid chunk because a bytes-like object is required :)"]
-    # mock_url = "https://example.com/file.bin"
-    # mock_file_name = "test_file.bin"
-
     invalid_task_id = 50
 
     dm = DownloadManager()
-    # task_id = dm.add_download(mock_url, mock_file_name)
     future = async_thread_runner.submit(dm.start_download(invalid_task_id))
     assert future.result() is False
     
-    assert await dm.resume_download(invalid_task_id) is False
+    assert await dm.start_download(invalid_task_id) is False
 
     assert await dm.delete_download(invalid_task_id) is False
 

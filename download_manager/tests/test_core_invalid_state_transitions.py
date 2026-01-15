@@ -151,8 +151,8 @@ async def test_resume_in_running_state(async_thread_runner, test_file_setup_and_
     logging.debug("Wait for dm to create the file")
     wait_for_file_to_be_created(mock_file_name)
 
-    future = async_thread_runner.submit(dm.resume_download(task_id))    
-    assert future.result() is False, "resume_download should have returned False"
+    future = async_thread_runner.submit(dm.start_download(task_id))    
+    assert future.result() is False, "start_download should have returned False"
 
     await dm.shutdown()
 
@@ -188,8 +188,8 @@ async def test_resume_completed_download(async_thread_runner, test_file_setup_an
     await wait_for_state(dm, task_id, DownloadState.RUNNING)
     await wait_for_state(dm, task_id, DownloadState.COMPLETED)
 
-    future = async_thread_runner.submit(dm.resume_download(task_id))    
-    assert future.result() is False, "resume_download should have returned False"
+    future = async_thread_runner.submit(dm.start_download(task_id))    
+    assert future.result() is False, "start_download should have returned False"
 
     await dm.shutdown()
 

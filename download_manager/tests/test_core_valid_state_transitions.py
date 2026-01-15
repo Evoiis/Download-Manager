@@ -143,7 +143,7 @@ async def test_resume_download(async_thread_runner, create_mock_response_and_set
     await mock_response.empty_queue()
 
     logging.debug("Resume Download")
-    async_thread_runner.submit(dm.resume_download(task_id))
+    async_thread_runner.submit(dm.start_download(task_id))
     
     await wait_for_state(dm, task_id, DownloadState.RUNNING)
 
@@ -353,9 +353,9 @@ async def test_resume_in_error_state(async_thread_runner, test_file_setup_and_cl
     await wait_for_state(dm, task_id, DownloadState.RUNNING)
     await wait_for_state(dm, task_id, DownloadState.ERROR)
 
-    logging.debug("Download is now in error state, now running resume_download")
+    logging.debug("Download is now in error state, now running start_download")
 
-    future = async_thread_runner.submit(dm.resume_download(task_id))
+    future = async_thread_runner.submit(dm.start_download(task_id))
     assert future.result()
 
     await wait_for_state(dm, task_id, DownloadState.RUNNING)

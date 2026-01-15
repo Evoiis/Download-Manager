@@ -19,8 +19,6 @@ KIBIBYTE_256 = 262144
 # TODO: Support default download folder
 # TODO: Save metadata to file: Persist preferences and download_metadata between restarts
 
-# TODO: Get rid of resume_download and replace with start_downlaod
-# TODO: Parallel downloads support resume download
 
 class DownloadState(Enum):
     PAUSED = 0
@@ -61,7 +59,6 @@ class DownloadMetadata:
     state: DownloadState = DownloadState.PENDING
     server_supports_http_range: bool = False
     use_parallel_download: bool = None
-    error_count: int = 0
 
 
 class DownloadManager:
@@ -92,7 +89,6 @@ class DownloadManager:
     async def _log_and_share_error_event(self, download: DownloadMetadata, err: Exception):
         logging.error(f"{repr(err)}, {err}")
         download.state = DownloadState.ERROR
-        download.error_count += 1
         await self.events_queue.put(DownloadEvent(
             task_id=download.task_id,
             state= download.state,
@@ -230,14 +226,6 @@ class DownloadManager:
             del self._tasks[download.task_id]
             return False
         self._tasks[download.task_id] = asyncio.create_task(self._download_file_coroutine(download))
-
-
-    async def resume_download(self, task_id: int) -> bool:
-        """
-        Wraps download coroutine into task to resume download
-        """
-        # TODO: Deprecate and update
-        return await self.start_download(task_id)
 
     async def pause_download(self, task_id: int) -> bool:
         """
@@ -517,8 +505,6 @@ class DownloadManager:
                 ))
                 break
             except Exception as err:
-                # TODO Count worker errors and handle accordingly
-                # TODO Create a new worker and retry?
                 if next_write_byte != end_bytes:
                     self._data_queues[download.task_id].put_nowait((next_write_byte, end_bytes))
 

@@ -15,14 +15,7 @@ A simple python download manager for windows.
 ### Planned:
 
 1. Finish parallel download tasks
-# TODO: Get rid of resume_download and replace with start_download
 # TODO: Can't pause when allocating space :/
-
-# TODO more parallel tests
-# Delete running
-# Resume parallel download
-# Multiple different downloads at the same time
-# TODO Count worker errors and handle accordingly
 
 2. Secondary Tasks
 # TODO: Save metadata to file: Persist preferences and download_metadata between restarts
