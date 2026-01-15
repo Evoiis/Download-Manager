@@ -403,8 +403,8 @@ async def test_start_in_error_state(async_thread_runner, test_file_setup_and_cle
 
 
 @pytest.mark.asyncio
-async def test_two_mb_download(async_thread_runner, test_file_setup_and_cleanup, create_mock_response_and_set_mock_session):
-    two_mb = b"a" * (2 * 1024 * 1024)
+async def test_two_mib_download(async_thread_runner, test_file_setup_and_cleanup, create_mock_response_and_set_mock_session):
+    two_mib = b"a" * (2 * 1024 * 1024)
     mock_url = "https://example.com/file.bin"
     mock_file_name = "test_file.bin"
     test_file_setup_and_cleanup(mock_file_name)
@@ -412,7 +412,7 @@ async def test_two_mb_download(async_thread_runner, test_file_setup_and_cleanup,
     mock_response = create_mock_response_and_set_mock_session(
         206,
         {
-            "Content-Length": len(two_mb),
+            "Content-Length": len(two_mib),
             "Accept-Ranges": "bytes"
         },
         mock_url
@@ -422,7 +422,7 @@ async def test_two_mb_download(async_thread_runner, test_file_setup_and_cleanup,
     task_id = dm.add_download(mock_url, mock_file_name)
     async_thread_runner.submit(dm.start_download(task_id))
 
-    await mock_response.insert_chunk(two_mb)
+    await mock_response.insert_chunk(two_mib)
     mock_response.end_response()
     
     await wait_for_state(dm, task_id, DownloadState.RUNNING)
@@ -435,8 +435,8 @@ async def test_two_mb_download(async_thread_runner, test_file_setup_and_cleanup,
 
 
 @pytest.mark.asyncio
-async def test_two_mb_download_no_http_ranges(async_thread_runner, test_file_setup_and_cleanup, create_mock_response_and_set_mock_session):
-    two_mb = b"a" * (2 * 1024 * 1024)
+async def test_two_mib_download_no_http_ranges(async_thread_runner, test_file_setup_and_cleanup, create_mock_response_and_set_mock_session):
+    two_mib = b"a" * (2 * 1024 * 1024)
     mock_url = "https://example.com/file.bin"
     mock_file_name = "test_file.bin"
     test_file_setup_and_cleanup(mock_file_name)
@@ -444,7 +444,7 @@ async def test_two_mb_download_no_http_ranges(async_thread_runner, test_file_set
     mock_response = create_mock_response_and_set_mock_session(
         200,
         {
-            "Content-Length": len(two_mb),
+            "Content-Length": len(two_mib),
         },
         mock_url
     )
@@ -453,7 +453,7 @@ async def test_two_mb_download_no_http_ranges(async_thread_runner, test_file_set
     task_id = dm.add_download(mock_url, mock_file_name)
     future = async_thread_runner.submit(dm.start_download(task_id))
 
-    await mock_response.insert_chunk(two_mb)
+    await mock_response.insert_chunk(two_mib)
     mock_response.end_response()
     
     await wait_for_state(dm, task_id, DownloadState.RUNNING)
