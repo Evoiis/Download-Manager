@@ -15,7 +15,7 @@ A simple python download manager for windows.
 ### Planned:
 
 1. Finish parallel download tasks
-# TODO: Can't pause when allocating space :/
+# Let user override number of parallel workers?
 
 2. Secondary Tasks
 # TODO: Save metadata to file: Persist preferences and download_metadata between restarts
@@ -33,8 +33,9 @@ A simple python download manager for windows.
 - Save metadata to file: Persist preferences and download_metadata between restarts
     - Support default download folder
 
-### Possible Extensions:
+### Possible Extensions (Not included to avoid scope creep):
 - Auto-shutdown/Keep-on Computer Logic
+- Download Speed limiter
 
 # Usage
 

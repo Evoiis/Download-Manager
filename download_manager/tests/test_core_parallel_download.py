@@ -1,8 +1,9 @@
 import asyncio
+import os
 import pytest
 import logging
 
-from dmanager.core import DownloadManager, DownloadState
+from dmanager.core import DownloadManager, DownloadState, DownloadMetadata
 from tests.helpers import wait_for_state, verify_file, wait_for_file_to_be_created, wait_for_multiple_states
 
 
@@ -335,3 +336,81 @@ async def test_multiple_simultaneous_parallel_download(async_thread_runner, crea
 
     await dm.shutdown()
 
+@pytest.mark.asyncio
+async def test_core_file_preallocation(async_thread_runner, create_mock_response_and_set_mock_session, test_file_setup_and_cleanup):
+
+    n_workers = 4
+    dm = DownloadManager(maximum_workers_per_task=n_workers, minimum_workers_per_task=n_workers)
+    mock_file_name = "test_file.bin"
+    mock_file_total_size = 9000
+    test_file_setup_and_cleanup(mock_file_name)
+    
+    download = DownloadMetadata(
+        1,
+        "",
+        mock_file_name,
+        file_size_bytes=mock_file_total_size,
+
+    )
+    await dm._preallocate_file_space_on_disk(download)
+
+    wait_for_file_to_be_created(mock_file_name)
+
+    assert mock_file_total_size == os.path.getsize(mock_file_name)
+
+
+@pytest.mark.asyncio
+async def test_parallel_pause_during_preallocate(async_thread_runner, create_parallel_mock_response_and_set_mock_session, test_file_setup_and_cleanup):
+    n_workers = 4
+    dm = DownloadManager(maximum_workers_per_task=n_workers, minimum_workers_per_task=n_workers)
+
+    mock_url = "https://example.com/file.txt"
+    mock_file_name = "test_file.txt"
+    test_file_setup_and_cleanup(mock_file_name)
+    mock_file_total_size = 6442450944 # 6 GIBIBYTES
+    
+    data = None
+
+    create_parallel_mock_response_and_set_mock_session(
+        206,
+        {
+            "Content-Length": mock_file_total_size,
+            "Accept-Ranges": "bytes"
+        },
+        mock_url,
+        [],
+        data
+    )
+    
+    task_id = dm.add_download(mock_url, mock_file_name)
+
+    async_thread_runner.submit(dm.start_download(task_id, use_parallel_download=True)) 
+
+    await wait_for_state(dm, task_id, DownloadState.ALLOCATING_SPACE)
+    wait_for_file_to_be_created(mock_file_name)
+
+    future = async_thread_runner.submit(dm.pause_download(task_id))
+
+    assert future.result() == True
+    await wait_for_state(dm, task_id, DownloadState.PAUSED)
+    
+    # Assumption: CPU/Disk won't be able to allocate 6 GIBIBYTES by this point
+    current_file_size = os.path.getsize(mock_file_name)
+    assert current_file_size != mock_file_total_size
+
+    await asyncio.sleep(10)
+
+    assert current_file_size == os.path.getsize(mock_file_name)
+
+    async_thread_runner.submit(dm.start_download(task_id, use_parallel_download=True)) 
+    
+    await wait_for_state(dm, task_id, DownloadState.ALLOCATING_SPACE)
+    await asyncio.sleep(1)
+
+    async_thread_runner.submit(dm.pause_download(task_id))
+
+    await wait_for_state(dm, task_id, DownloadState.PAUSED)
+
+    assert current_file_size < os.path.getsize(mock_file_name)
+    
+    await dm.shutdown()

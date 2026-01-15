@@ -74,6 +74,7 @@ class DownloadManager:
         self.events_queue: asyncio.Queue[Dict[str, Any]] = asyncio.Queue()
         self._tasks: Dict[int, asyncio.Task[Any]] = {}
         self._task_pools: Dict[int, list] = {}
+        self._preallocate_tasks: Dict[int, asyncio.Task[Any]] = {}
         self._data_queues: Dict[int, asyncio.Queue] = {}
         self._session: aiohttp.ClientSession = None
 
@@ -104,6 +105,10 @@ class DownloadManager:
         for task_id in self._task_pools:
             for task in self._task_pools[task_id]:
                 task.cancel()
+        
+        for task_id in self._preallocate_tasks:
+            if not self._preallocate_tasks[task_id].done():
+                self._preallocate_tasks[task_id].cancel()
         
         if self._session is not None:
             await self._session.close()
@@ -161,7 +166,7 @@ class DownloadManager:
                 os.remove(download.output_file)
 
         try:
-            await self._check_download_headers(download)
+            await self._check_download_headers(download)                
         except Exception as err:
             tb = traceback.format_exc()
             logging.error(f"Traceback: {tb}")
@@ -174,7 +179,8 @@ class DownloadManager:
             if (download.file_size_bytes > ONE_GIBIB and use_parallel_download is None) or use_parallel_download is True:
                 download.use_parallel_download = True
 
-            if not download.server_supports_http_range or use_parallel_download is False:
+            # If the server doesn't have htttp range support or didn't provide Content-Length then we can't use parallel download
+            if not download.server_supports_http_range or download.file_size_bytes is None or use_parallel_download is False:
                 download.use_parallel_download = False
 
         # Initialize async downloads
@@ -187,7 +193,7 @@ class DownloadManager:
     async def _run_parallel_connection_download(self, download: DownloadMetadata):
         if await self._check_if_complete_file_on_disk(download):
             if download.task_id in self._data_queues and self._data_queues[download.task_id].empty():
-                logging.debug("Found complete file in directory. Not starting/restarting download.")
+                logging.debug("Found file in directory and download queues are empty. Marking download as complete.")
                 download.state = DownloadState.COMPLETED
                 await self.events_queue.put(DownloadEvent(
                     task_id=download.task_id,
@@ -197,22 +203,48 @@ class DownloadManager:
                 del self._tasks[download.task_id]
                 return False
         try:
-            if download.task_id not in self._data_queues:
-                # Pre-allocate file on disk
-                async with aiofiles.open(download.output_file, "wb") as f:
-                    download.state = DownloadState.ALLOCATING_SPACE
-                    await self.events_queue.put(DownloadEvent(
-                        task_id=download.task_id,
-                        state=download.state,
-                        output_file=None
-                    ))
-                    await f.truncate(download.file_size_bytes)
+            if not os.path.exists(download.output_file) or (os.path.exists(download.output_file) and os.path.getsize(download.output_file) != download.file_size_bytes):
+                self._preallocate_tasks[download.task_id] = asyncio.create_task(self._preallocate_file_space_on_disk(download))
+                await self._preallocate_tasks[download.task_id]
+
+                if download.task_id in self._preallocate_tasks:
+                    del self._preallocate_tasks[download.task_id]
 
             await self._create_task_pool(download)
+        except asyncio.CancelledError:
+            logging.debug(f"{download.task_id=} paused during pre-allocating phase.")
+            download.state = DownloadState.PAUSED
+            await self.events_queue.put(DownloadEvent(
+                task_id=download.task_id,
+                state= download.state,
+                output_file=download.output_file
+            ))
+            raise
         except Exception as err:
             tb = traceback.format_exc()
             logging.error(f"Traceback: {tb}")
             await self._log_and_share_error_event(download, err)
+    
+    async def _preallocate_file_space_on_disk(self, download: DownloadMetadata):
+        download.state = DownloadState.ALLOCATING_SPACE
+        await self.events_queue.put(DownloadEvent(
+            task_id=download.task_id,
+            state=download.state,
+            output_file=None
+        ))
+
+        file_size_on_disk = 0
+        if os.path.exists(download.output_file):
+            file_size_on_disk = os.path.getsize(download.output_file)
+            logging.debug(f"Found partially allocated file, resume from {file_size_on_disk=}")
+        next_write_byte = file_size_on_disk
+        async with aiofiles.open(download.output_file, "wb") as f:
+            while next_write_byte < download.file_size_bytes:
+                await f.seek(next_write_byte)
+                chunk_size = min(KIBIBYTE_256, download.file_size_bytes - next_write_byte)
+                await f.write(b"\x00" * chunk_size)
+                next_write_byte += chunk_size
+
 
     async def _run_single_connection_download(self, download:DownloadMetadata):
         download.downloaded_bytes = os.path.getsize(download.output_file) if os.path.exists(download.output_file) else 0
@@ -238,9 +270,24 @@ class DownloadManager:
             logging.debug("[DM] pause_download called")
             if task_id not in self._downloads:
                 logging.warning(f"Pause download called with invalid {task_id=}")
-                return False
-            
+                return False            
+
             download = self._downloads[task_id]
+            if download.state == DownloadState.ALLOCATING_SPACE:
+                if task_id in self._preallocate_tasks:
+                    task = self._preallocate_tasks[task_id]
+                    if not task.done():
+                        task.cancel()
+                        try: 
+                            await task
+                        except asyncio.CancelledError:
+                            pass
+                    if task_id in self._preallocate_tasks:
+                        del self._preallocate_tasks[task_id]
+                    return True
+                else:
+                    return False
+
             if download.state != DownloadState.RUNNING:
                 logging.warning("Pause download called on non-running task")
                 return False
@@ -375,10 +422,11 @@ class DownloadManager:
                         download.output_file += ".file"
     
     async def _check_if_complete_file_on_disk(self, download: DownloadMetadata):
-        if download.file_size_bytes is not None:
-            if download.downloaded_bytes == download.file_size_bytes:
+        output_file_size = os.path.getsize(download.output_file) if os.path.exists(download.output_file) else 0
+        if output_file_size != 0:
+            if output_file_size == download.file_size_bytes:
                 return True
-            elif download.downloaded_bytes > download.file_size_bytes:
+            elif output_file_size > download.file_size_bytes:
                 download.state = DownloadState.ERROR
                 await self.events_queue.put(DownloadEvent(
                     task_id=download.task_id,

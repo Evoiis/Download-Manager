@@ -78,11 +78,13 @@ class MockParallelResponse():
         return False
 
     async def iter_chunked(self, _):
+        if self.data is None:
+            return
         data_range_request = await self.request_queue.get()
         range_end = data_range_request.split("-")[-1]
         while True:
             if range_end not in self.send_next_letter:
-                raise Exception(f"Got unexpected {range_end=}")
+                    raise Exception(f"Got unexpected {range_end=}")
             if self.send_next_letter[range_end] > 0:
                 if len(self.data[range_end]) > 0:
                     yield bytes([self.data[range_end].pop(0)])
