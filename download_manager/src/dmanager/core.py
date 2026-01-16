@@ -12,7 +12,7 @@ import aiohttp
 import aiofiles
 import traceback
 
-ONE_GIBIB = 1073741824
+ONE_GIBIBYTE = 1073741824
 ONE_MEBIBYTE = 1048576
 KIBIBYTE_256 = 262144
 
@@ -196,7 +196,7 @@ class DownloadManager:
         # Parallel download decision
         if download.use_parallel_download == None:
             download.use_parallel_download = False
-            if (download.file_size_bytes > ONE_GIBIB and use_parallel_download is None) or use_parallel_download is True:
+            if (download.file_size_bytes > ONE_GIBIBYTE and use_parallel_download is None) or use_parallel_download is True:
                 download.use_parallel_download = True
 
             # If the server doesn't have htttp range support or didn't provide Content-Length then we can't use parallel download
@@ -527,18 +527,23 @@ class DownloadManager:
 
         if task_id not in self._data_queues:
             self._data_queues[task_id] = asyncio.Queue()
-            prev_bytes = None
             if download.file_size_bytes is None or download.file_size_bytes == 0:
                 raise Exception("Parallel download requires Content-Length header")
-            if download.file_size_bytes < ONE_GIBIB:
+            
+            if download.file_size_bytes < ONE_GIBIBYTE:
                 increment = int(download.file_size_bytes // 4)
             else:
-                increment = int(download.file_size_bytes // (download.file_size_bytes // (ONE_GIBIB/2)))
+                increment = int(download.file_size_bytes // (download.file_size_bytes // (ONE_GIBIBYTE/2)))
             
-            for end_bytes in range(0, download.file_size_bytes + 1, increment):
-                if prev_bytes is not None:
-                    await self._data_queues[task_id].put((prev_bytes, end_bytes))
-                prev_bytes = end_bytes
+            prev_bytes = 0
+            current_byte = 0
+            while current_byte < download.file_size_bytes:
+                current_byte += increment
+                if current_byte > download.file_size_bytes:
+                    current_byte = download.file_size_bytes
+                self._data_queues[task_id].put_nowait((prev_bytes, current_byte))
+                prev_bytes = current_byte           
+            
 
         n_workers = max(min(self._maximum_workers_per_task, self._data_queues[task_id].qsize()), self._minimum_workers_per_task)
 
