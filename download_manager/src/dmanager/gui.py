@@ -65,64 +65,67 @@ class DownloadManagerGUI:
     async def _read_event_loop(self):
         try:
             event = await self.dmanager.get_oldest_event()
-
             if event is not None:
                 logging.debug(event)
-                if event.state == DownloadState.DELETED:
-                    self.table.delete(self.task_id_to_table_row[event.task_id])                
-                elif event.worker_id is not None:
-                    if (event.task_id, event.worker_id) in self.task_id_and_worker_id_to_table_row:
-                        values = list(self.table.item(self.task_id_and_worker_id_to_table_row[(event.task_id, event.worker_id)], "values"))
-
-                        values[1] = event.state.name
-                        if event.download_speed is not None:
-                            values[5] = f"{round((event.download_speed / ONE_MEBIBYTE), 4)} MiB/s"
-                        values[6] = event.error_string
-                        values[7] = self._translate_active_time_to_string(event.active_time)
-
-                        self.table.item(
-                            self.task_id_and_worker_id_to_table_row[(event.task_id, event.worker_id)],
-                            values=values
-                        )
-                    elif event.download_speed is not None:                        
-                        self.task_id_and_worker_id_to_table_row[(event.task_id, event.worker_id)] = self.table.insert(
-                            self.task_id_to_table_row[event.task_id],
-                            "end",
-                            values=(f"🔼 Worker: {event.worker_id}", event.state.name, "", "", "", f"{round((event.download_speed / ONE_MEBIBYTE), 4)} MiB/s" , event.error_string, event.active_time, "", "", "")
-                        )
-                    
-                    values = list(self.table.item(self.task_id_to_table_row[event.task_id], "values"))
-                    values[1] = event.state.name
-                    values[3] = event.output_file
-                    if event.downloaded_bytes is not None and event.download_size_bytes is not None and event.download_size_bytes > 0:
-                        values[4] = f"{round(event.downloaded_bytes/ONE_MEBIBYTE, 4)} MiB / {round(event.download_size_bytes/ONE_MEBIBYTE, 4)} MiB ({round(100*event.downloaded_bytes/event.download_size_bytes, 2)})"
-
-                    self.table.item(
-                        self.task_id_to_table_row[event.task_id],
-                        values=values
-                    )
-
-                else:
-                    values = list(self.table.item(self.task_id_to_table_row[event.task_id], "values"))
-                    values[1] = event.state.name
-                    values[3] = event.output_file
-                    if event.downloaded_bytes is not None and event.download_size_bytes is not None and event.download_size_bytes > 0:
-                        values[4] = f"{round(event.downloaded_bytes/ONE_MEBIBYTE, 4)} MiB / {round(event.download_size_bytes/ONE_MEBIBYTE, 4)} MiB ({round(100*event.downloaded_bytes/event.download_size_bytes, 2)})"
-                    if event.download_speed is not None:
-                        values[5] = f"{round((event.download_speed / (ONE_MEBIBYTE)), 4)} MiB/s"
-                    values[6] = event.error_string
-                    values[7] = self._translate_active_time_to_string(event.active_time)
-
-                    self.table.item(
-                        self.task_id_to_table_row[event.task_id],
-                        values=values
-                    )
-
+                # Schedule GUI update in main thread
+                self.root.after(0, lambda: self._update_gui_with_event(event))
         except Exception as err:
             tb = traceback.format_exc()
             logging.error(f"Traceback: {tb}")
             logging.error(f"{repr(err)}, {err}")
         self.root.after(self.event_poll_rate, self._add_read_event_loop_to_async_thread)
+
+    def _update_gui_with_event(self, event):
+        """Update GUI widgets with event data."""
+        if event.state == DownloadState.DELETED:
+            self.table.delete(self.task_id_to_table_row[event.task_id])
+        elif event.worker_id is not None:
+            if (event.task_id, event.worker_id) in self.task_id_and_worker_id_to_table_row:
+                values = list(self.table.item(self.task_id_and_worker_id_to_table_row[(event.task_id, event.worker_id)], "values"))
+
+                values[1] = event.state.name
+                if event.download_speed is not None:
+                    values[5] = f"{round((event.download_speed / ONE_MEBIBYTE), 4)} MiB/s"
+                values[6] = event.error_string
+                values[7] = self._translate_active_time_to_string(event.active_time)
+
+                self.table.item(
+                    self.task_id_and_worker_id_to_table_row[(event.task_id, event.worker_id)],
+                    values=values
+                )
+            elif event.download_speed is not None:
+                self.task_id_and_worker_id_to_table_row[(event.task_id, event.worker_id)] = self.table.insert(
+                    self.task_id_to_table_row[event.task_id],
+                    "end",
+                    values=(f"🔼 Worker: {event.worker_id}", event.state.name, "", "", "", f"{round((event.download_speed / ONE_MEBIBYTE), 4)} MiB/s" , event.error_string, event.active_time, "", "", "")
+                )
+
+            values = list(self.table.item(self.task_id_to_table_row[event.task_id], "values"))
+            values[1] = event.state.name
+            values[3] = event.output_file
+            if event.downloaded_bytes is not None and event.download_size_bytes is not None and event.download_size_bytes > 0:
+                values[4] = f"{round(event.downloaded_bytes/ONE_MEBIBYTE, 4)} MiB / {round(event.download_size_bytes/ONE_MEBIBYTE, 4)} MiB ({round(100*event.downloaded_bytes/event.download_size_bytes, 2)}%)"
+
+            self.table.item(
+                self.task_id_to_table_row[event.task_id],
+                values=values
+            )
+
+        else:
+            values = list(self.table.item(self.task_id_to_table_row[event.task_id], "values"))
+            values[1] = event.state.name
+            values[3] = event.output_file
+            if event.downloaded_bytes is not None and event.download_size_bytes is not None and event.download_size_bytes > 0:
+                values[4] = f"{round(event.downloaded_bytes/ONE_MEBIBYTE, 4)} MiB / {round(event.download_size_bytes/ONE_MEBIBYTE, 4)} MiB ({round(100*event.downloaded_bytes/event.download_size_bytes, 2)}%)"
+            if event.download_speed is not None:
+                values[5] = f"{round((event.download_speed / (ONE_MEBIBYTE)), 4)} MiB/s"
+            values[6] = event.error_string
+            values[7] = self._translate_active_time_to_string(event.active_time)
+
+            self.table.item(
+                self.task_id_to_table_row[event.task_id],
+                values=values
+            )
 
     def _add_new_download(self):
         url = self.url_input_element.get()
@@ -275,6 +278,4 @@ class DownloadManagerGUI:
         y = py + (ph // 2) - (h // 2)
 
         window.geometry(f"+{x}+{y}")
-
-
 

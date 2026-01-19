@@ -97,6 +97,9 @@ class DownloadManager:
         ))
 
     async def shutdown(self):
+        for task_id in self._downloads:
+            await self.pause_download(task_id)
+
         for task_id in self._tasks:
             if not self._tasks[task_id].done():
                 self._tasks[task_id].cancel()
@@ -503,7 +506,6 @@ class DownloadManager:
                     error_string="There is already a downloaded file with the same name with a greater size!",
                     output_file=download.output_file
                 ))
-                # TODO: rework output file naming
                 raise Exception("Existing file blocking output file.")
         
         return False
