@@ -536,7 +536,7 @@ class DownloadManager:
             if download.file_size_bytes < ONE_GIBIBYTE:
                 increment = int(download.file_size_bytes // 4)
             else:
-                increment = int(download.file_size_bytes // (download.file_size_bytes // (ONE_GIBIBYTE/2)))
+                increment = int(download.file_size_bytes // (download.file_size_bytes // (ONE_GIBIBYTE//2)))
             
             prev_bytes = 0
             current_byte = 0
