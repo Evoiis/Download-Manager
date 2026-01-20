@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from typing import Dict, Optional, Any
 from mimetypes import guess_extension
 from datetime import datetime, timedelta
+import queue
 
 import re
 import logging
@@ -31,7 +32,7 @@ class DownloadEvent:
     task_id: int
     state: DownloadState
     output_file: str
-    time: datetime = 0
+    time: datetime = None
     error_string: Optional[str] = ""
     download_speed: float = None
     active_time: timedelta = None
@@ -67,7 +68,7 @@ class DownloadManager:
 
         self._downloads: Dict[int, DownloadMetadata] = {}
         self._next_id = 0
-        self.events_queue: asyncio.Queue[Dict[str, Any]] = asyncio.Queue()
+        self.events_queue: queue.Queue[DownloadEvent] = queue.Queue()
         self._tasks: Dict[int, asyncio.Task[Any]] = {}
         self._task_pools: Dict[int, list] = {}
         self._preallocate_tasks: Dict[int, asyncio.Task[Any]] = {}
@@ -89,7 +90,7 @@ class DownloadManager:
         """
         logging.error(f"{repr(err)}, {err}")
         download.state = DownloadState.ERROR
-        await self.events_queue.put(DownloadEvent(
+        self.events_queue.put_nowait(DownloadEvent(
             task_id=download.task_id,
             state= download.state,
             error_string=f"{repr(err)}, {err}",
@@ -229,7 +230,7 @@ class DownloadManager:
             if download.task_id in self._data_queues and self._data_queues[download.task_id].empty():
                 logging.debug("Found file in directory and download queues are empty. Marking download as complete.")
                 download.state = DownloadState.COMPLETED
-                await self.events_queue.put(DownloadEvent(
+                self.events_queue.put_nowait(DownloadEvent(
                     task_id=download.task_id,
                     state=download.state,
                     output_file=download.output_file
@@ -248,7 +249,7 @@ class DownloadManager:
         except asyncio.CancelledError:
             logging.debug(f"{download.task_id=} paused during pre-allocating phase.")
             download.state = DownloadState.PAUSED
-            await self.events_queue.put(DownloadEvent(
+            self.events_queue.put_nowait(DownloadEvent(
                 task_id=download.task_id,
                 state= download.state,
                 output_file=download.output_file
@@ -267,7 +268,7 @@ class DownloadManager:
         """
 
         download.state = DownloadState.ALLOCATING_SPACE
-        await self.events_queue.put(DownloadEvent(
+        self.events_queue.put_nowait(DownloadEvent(
             task_id=download.task_id,
             state=download.state,
             output_file=None
@@ -299,7 +300,7 @@ class DownloadManager:
         download.downloaded_bytes = os.path.getsize(download.output_file) if os.path.exists(download.output_file) else 0
         if await self._check_if_complete_file_on_disk(download):
             download.state = DownloadState.COMPLETED
-            await self.events_queue.put(DownloadEvent(
+            self.events_queue.put_nowait(DownloadEvent(
                 task_id=download.task_id,
                 state=download.state,
                 output_file=download.output_file
@@ -419,7 +420,7 @@ class DownloadManager:
             if task_id in self._downloads:
                 del self._downloads[task_id]
 
-            await self.events_queue.put(
+            self.events_queue.put_nowait(
                 DownloadEvent(
                     task_id=task_id,
                     state=DownloadState.DELETED,
@@ -445,7 +446,7 @@ class DownloadManager:
         - Generates an output filename if none is provided
         """
 
-        async with self._session.head(download.url) as resp:
+        async with self._session.head(download.url, timeout=aiohttp.ClientTimeout(total=300)) as resp:
             if "ETag" in resp.headers:
                 if download.etag == None:
                     download.etag = resp.headers["ETag"][1:-1]
@@ -500,7 +501,7 @@ class DownloadManager:
                 return True
             elif output_file_size > download.file_size_bytes:
                 download.state = DownloadState.ERROR
-                await self.events_queue.put(DownloadEvent(
+                self.events_queue.put_nowait(DownloadEvent(
                     task_id=download.task_id,
                     state= download.state,
                     error_string="There is already a downloaded file with the same name with a greater size!",
@@ -594,7 +595,7 @@ class DownloadManager:
                 last_active_time_update = datetime.now()
 
                 async with aiofiles.open(download.output_file, "r+b") as f:
-                    async with self._session.get(download.url, headers=headers) as resp:
+                    async with self._session.get(download.url, headers=headers, timeout=aiohttp.ClientTimeout(total=300)) as resp:
                         async for chunk in resp.content.iter_chunked(KIBIBYTE_256):
                             chunk_start_time = datetime.now()
                             if resp.status != 206:
@@ -615,7 +616,7 @@ class DownloadManager:
 
                                 chunk_time_seconds = chunk_time_delta.total_seconds()
                                 download.state = DownloadState.RUNNING
-                                await self.events_queue.put(DownloadEvent(
+                                self.events_queue.put_nowait(DownloadEvent(
                                     task_id=download.task_id,
                                     state=download.state,
                                     output_file=download.output_file,
@@ -631,7 +632,7 @@ class DownloadManager:
                     self._data_queues[download.task_id].put_nowait((next_write_byte, end_bytes))
 
                 download.state = DownloadState.PAUSED
-                await self.events_queue.put(DownloadEvent(
+                self.events_queue.put_nowait(DownloadEvent(
                     task_id=download.task_id,
                     state= download.state,
                     output_file=download.output_file,
@@ -642,7 +643,7 @@ class DownloadManager:
             except asyncio.QueueEmpty:
                 logging.debug(f"Worker {worker_id} found no tasks, worker complete.")
                 download.state = DownloadState.COMPLETED
-                await self.events_queue.put(DownloadEvent(
+                self.events_queue.put_nowait(DownloadEvent(
                     task_id=download.task_id,
                     state= download.state,
                     output_file=download.output_file,
@@ -661,7 +662,7 @@ class DownloadManager:
                 tb = traceback.format_exc()
                 logging.error(f"Traceback: {tb}")
                 download.state = DownloadState.ERROR
-                await self.events_queue.put(DownloadEvent(
+                self.events_queue.put_nowait(DownloadEvent(
                     task_id=download.task_id,
                     state= download.state,
                     error_string=f"{repr(err)}, {err}",
@@ -694,7 +695,7 @@ class DownloadManager:
             
             # TODO Get rid of this running event update
             download.state = DownloadState.RUNNING
-            await self.events_queue.put(DownloadEvent(
+            self.events_queue.put_nowait(DownloadEvent(
                 task_id=download.task_id,
                 state=download.state,
                 output_file=download.output_file
@@ -704,7 +705,7 @@ class DownloadManager:
             last_active_time_update = datetime.now()
             chunk_time_delta = timedelta()
 
-            async with self._session.get(download.url, headers=headers) as resp:
+            async with self._session.get(download.url, headers=headers, timeout=aiohttp.ClientTimeout(total=300)) as resp:
                 async for chunk in resp.content.iter_chunked(KIBIBYTE_256):
                     chunk_start_time = datetime.now()
                     if resp.status == 206:
@@ -726,7 +727,7 @@ class DownloadManager:
                         last_running_update = datetime.now()
                         download.state = DownloadState.RUNNING
                         chunk_time_seconds = chunk_time_delta.total_seconds()
-                        await self.events_queue.put(DownloadEvent(
+                        self.events_queue.put_nowait(DownloadEvent(
                             task_id=download.task_id,
                             state=download.state,
                             output_file=download.output_file,
@@ -737,7 +738,7 @@ class DownloadManager:
                         ))
 
             download.state = DownloadState.COMPLETED
-            await self.events_queue.put(DownloadEvent(
+            self.events_queue.put_nowait(DownloadEvent(
                 task_id=download.task_id,
                 state= download.state,
                 output_file=download.output_file,
@@ -750,7 +751,7 @@ class DownloadManager:
             del self._tasks[download.task_id]
         except asyncio.CancelledError:
             download.state = DownloadState.PAUSED
-            await self.events_queue.put(DownloadEvent(
+            self.events_queue.put_nowait(DownloadEvent(
                 task_id=download.task_id,
                 state= download.state,
                 output_file=download.output_file

@@ -51,10 +51,10 @@ class MockSession:
     async def __aexit__(self, exc_type, exc, tb):
         pass
 
-    def get(self, url, headers=None):        
+    def get(self, url, headers=None, timeout=None):
         return self._responses[url]
 
-    def head(self, url):
+    def head(self, url, timeout):
         return self._responses[url]
     
     async def close(self):
@@ -122,11 +122,11 @@ class MockParallelSession:
     async def __aexit__(self, exc_type, exc, tb):
         pass
 
-    def get(self, url, headers=None):   
+    def get(self, url, headers=None, timeout=None):
         self.request_queues[url].put_nowait(headers["Range"])
         return self._responses[url]
 
-    def head(self, url):
+    def head(self, url, timeout):
         return self._responses[url]
 
     async def close(self):
