@@ -100,42 +100,26 @@ class DownloadManager:
         ))
 
     async def shutdown(self):
+        task_sets = [self._tasks.values(), self._preallocate_tasks.values()]
+
+        for pool in self._task_pools.values():
+            task_sets.append(pool)
+
+        for task_set in task_sets:
+            for task in task_set:
+                if not task.done():
+                    task.cancel()
+                    try:
+                        await task
+                    except asyncio.CancelledError:
+                        pass
+                    
+
         if self._session is not None:
             try:
                 await self._session.close()
             except asyncio.CancelledError:
                 pass
-
-        for task_id in self._tasks:
-            self._tasks[task_id].cancel()
-            try: 
-                await self._tasks[task_id]
-            except asyncio.CancelledError:
-                pass
-
-        del self._tasks
-
-        for task_id in self._task_pools:
-            for task in self._task_pools[task_id]:
-                task.cancel()
-                try:
-                    await task
-                except asyncio.CancelledError:
-                    pass
-
-        
-        del self._task_pools
-        
-        for task_id in self._preallocate_tasks:
-            if not self._preallocate_tasks[task_id].done():
-                self._preallocate_tasks[task_id].cancel()
-                try:
-                    await self._preallocate_tasks[task_id]
-                except asyncio.CancelledError:
-                    pass
-
-        
-        del self._preallocate_tasks                
     
     def get_downloads(self) -> Dict[int, DownloadMetadata]:
         return self._downloads

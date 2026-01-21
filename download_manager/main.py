@@ -23,7 +23,7 @@ def main():
 
     gui.run_gui_loop()
 
-    logging.info("Shutting down download Manager")
+    logging.info("Shutting down download manager")
     future = runner.submit(dmanager.shutdown())
 
     try:
@@ -33,7 +33,7 @@ def main():
     except CancelledError:
         pass
     finally:
-        logging.info("Shutting Down Async Thread")
+        logging.info("Shutting down async thread")
         runner.shutdown()
 
 
