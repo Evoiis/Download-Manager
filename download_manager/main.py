@@ -1,6 +1,7 @@
 from src.dmanager.core import DownloadManager
 from src.dmanager.asyncio_thread import AsyncioEventLoopThread
 from src.dmanager.gui import DownloadManagerGUI
+from concurrent.futures._base import CancelledError
 
 import logging
 import argparse
@@ -22,7 +23,19 @@ def main():
 
     gui.run_gui_loop()
 
-    runner.submit(dmanager.shutdown())
+    logging.info("Shutting down download Manager")
+    future = runner.submit(dmanager.shutdown())
+
+    try:
+        future.result(timeout=10)
+    except TimeoutError:
+        logging.warning("Download Manager Shutdown timed out.")
+    except CancelledError:
+        pass
+    finally:
+        logging.info("Shutting Down Async Thread")
+        runner.shutdown()
+
 
 if __name__ == "__main__":
     main()

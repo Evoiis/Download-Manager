@@ -72,7 +72,9 @@ async def test_empty_output_file_name(async_thread_runner, create_mock_response_
 
     logging.debug(dm.get_downloads())
     assert dm.get_downloads()[task_id].output_file.endswith(".mp4")
-    await dm.shutdown()
+    
+    future = async_thread_runner.submit(dm.shutdown())
+    future.result()
 
     await wait_for_state(dm, task_id, DownloadState.PAUSED)
 
@@ -94,7 +96,8 @@ async def test_input_invalid_url(async_thread_runner):
     assert not future.result()
     await wait_for_state(dm, task_id, DownloadState.ERROR)
 
-    await dm.shutdown()
+    future = async_thread_runner.submit(dm.shutdown())
+    future.result()
     
 
 @pytest.mark.asyncio
@@ -137,4 +140,5 @@ async def test_invalid_test_id(async_thread_runner):
 
     assert await dm.pause_download(invalid_task_id) is False
 
-    await dm.shutdown()    
+    future = async_thread_runner.submit(dm.shutdown())
+    future.result()

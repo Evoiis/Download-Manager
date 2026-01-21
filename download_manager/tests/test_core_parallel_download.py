@@ -60,7 +60,8 @@ async def test_n_worker_parallel_download_coroutine(async_thread_runner, create_
     )
 
     
-    await dm.shutdown()
+    future = async_thread_runner.submit(dm.shutdown())
+    future.result()
 
 
 @pytest.mark.asyncio
@@ -106,7 +107,8 @@ async def test_parallel_download_pause(async_thread_runner, create_parallel_mock
     for _ in range(n_workers):
         await wait_for_state(dm, task_id, DownloadState.PAUSED)
     
-    await dm.shutdown()
+    future = async_thread_runner.submit(dm.shutdown())
+    future.result()
 
 
 @pytest.mark.asyncio
@@ -167,7 +169,8 @@ async def test_parallel_download_resume(async_thread_runner, create_parallel_moc
         "".join(bytes(x).decode('ascii') for x in data.values())
     )
     
-    await dm.shutdown()
+    future = async_thread_runner.submit(dm.shutdown())
+    future.result()
 
 
 
@@ -217,7 +220,8 @@ async def test_parallel_download_delete_running(async_thread_runner, create_para
     assert task_id not in dm._downloads
     assert task_id not in dm._task_pools
 
-    await dm.shutdown()
+    future = async_thread_runner.submit(dm.shutdown())
+    future.result()
 
 @pytest.mark.asyncio
 async def test_parallel_download_delete_completed(async_thread_runner, create_parallel_mock_response_and_set_mock_session, test_file_setup_and_cleanup):
@@ -271,7 +275,8 @@ async def test_parallel_download_delete_completed(async_thread_runner, create_pa
         "".join(bytes(x).decode('ascii') for x in data.values())
     )
 
-    await dm.shutdown()
+    future = async_thread_runner.submit(dm.shutdown())
+    future.result()
 
 @pytest.mark.asyncio
 async def test_multiple_simultaneous_parallel_download(async_thread_runner, create_multiple_parallel_mock_response_and_mock_sessions, test_multiple_file_setup_and_cleanup):
@@ -341,7 +346,8 @@ async def test_multiple_simultaneous_parallel_download(async_thread_runner, crea
         "".join(bytes(x).decode('ascii') for x in data.values())
     )
 
-    await dm.shutdown()
+    future = async_thread_runner.submit(dm.shutdown())
+    future.result()
 
 @pytest.mark.asyncio
 async def test_core_file_preallocation(test_file_setup_and_cleanup):
@@ -420,4 +426,5 @@ async def test_parallel_pause_during_preallocate(async_thread_runner, create_par
 
     assert current_file_size < os.path.getsize(mock_file_name)
     
-    await dm.shutdown()
+    future = async_thread_runner.submit(dm.shutdown())
+    future.result()

@@ -48,7 +48,8 @@ async def test_add_and_start_download(async_thread_runner, create_mock_response_
 
     verify_file(mock_file_name, "abcdefghi")
 
-    await dm.shutdown()
+    future = async_thread_runner.submit(dm.shutdown())
+    future.result()
 
 
 @pytest.mark.asyncio
@@ -98,7 +99,8 @@ async def test_pause_download(async_thread_runner, create_mock_response_and_set_
     logging.debug("Verifying only the first chunk was written to file")
     verify_file(mock_file_name, "abc")
 
-    await dm.shutdown()
+    future = async_thread_runner.submit(dm.shutdown())
+    future.result()
 
 
 @pytest.mark.asyncio
@@ -155,7 +157,8 @@ async def test_resume_download(async_thread_runner, create_mock_response_and_set
     # Verify
     verify_file(mock_file_name, "abcghi")
 
-    await dm.shutdown()
+    future = async_thread_runner.submit(dm.shutdown())
+    future.result()
 
 
 @pytest.mark.asyncio
@@ -171,7 +174,8 @@ async def test_delete_from_pending_state():
 
     assert task_id not in dm.get_downloads()
 
-    await dm.shutdown()
+    future = async_thread_runner.submit(dm.shutdown())
+    future.result()
 
 @pytest.mark.asyncio
 async def test_delete_from_running_state(async_thread_runner, test_file_setup_and_cleanup, create_mock_response_and_set_mock_session):
@@ -207,7 +211,8 @@ async def test_delete_from_running_state(async_thread_runner, test_file_setup_an
     assert task_id not in dm._tasks
     assert os.path.exists(mock_file_name)
 
-    await dm.shutdown()
+    future = async_thread_runner.submit(dm.shutdown())
+    future.result()
 
 @pytest.mark.asyncio
 async def test_delete_from_paused_state(async_thread_runner, test_file_setup_and_cleanup, create_mock_response_and_set_mock_session):
@@ -247,7 +252,8 @@ async def test_delete_from_paused_state(async_thread_runner, test_file_setup_and
     assert task_id not in dm._tasks
     assert os.path.exists(mock_file_name)
 
-    await dm.shutdown()
+    future = async_thread_runner.submit(dm.shutdown())
+    future.result()
     
 
 @pytest.mark.asyncio
@@ -284,7 +290,8 @@ async def test_delete_from_error_state(async_thread_runner, test_file_setup_and_
     assert task_id not in dm._tasks
     assert os.path.exists(mock_file_name)
 
-    await dm.shutdown()
+    future = async_thread_runner.submit(dm.shutdown())
+    future.result()
 
 
 @pytest.mark.asyncio
@@ -325,7 +332,8 @@ async def test_delete_from_completed_state(async_thread_runner, test_file_setup_
     assert task_id not in dm._tasks
     assert os.path.exists(mock_file_name)
 
-    await dm.shutdown()
+    future = async_thread_runner.submit(dm.shutdown())
+    future.result()
 
 
 @pytest.mark.asyncio
@@ -367,7 +375,8 @@ async def test_resume_in_error_state(async_thread_runner, test_file_setup_and_cl
 
     verify_file(mock_file_name, "This is a valid chunk!")
 
-    await dm.shutdown()
+    future = async_thread_runner.submit(dm.shutdown())
+    future.result()
 @pytest.mark.asyncio
 async def test_start_in_error_state(async_thread_runner, test_file_setup_and_cleanup, create_mock_response_and_set_mock_session):
     chunks = ["invalid chunk because a bytes-like object is required :)"]
@@ -399,7 +408,8 @@ async def test_start_in_error_state(async_thread_runner, test_file_setup_and_cle
     assert future.result()
     await wait_for_state(dm, task_id, DownloadState.RUNNING)
 
-    await dm.shutdown()
+    future = async_thread_runner.submit(dm.shutdown())
+    future.result()
 
 
 @pytest.mark.asyncio
@@ -431,7 +441,8 @@ async def test_two_mib_download(async_thread_runner, test_file_setup_and_cleanup
 
     verify_file(mock_file_name, "a" * (2 * 1024 * 1024))
 
-    await dm.shutdown()
+    future = async_thread_runner.submit(dm.shutdown())
+    future.result()
 
 
 @pytest.mark.asyncio
@@ -462,7 +473,8 @@ async def test_two_mib_download_no_http_ranges(async_thread_runner, test_file_se
 
     verify_file(mock_file_name, "a" * (2 * 1024 * 1024))
 
-    await dm.shutdown()
+    future = async_thread_runner.submit(dm.shutdown())
+    future.result()
 
 
 @pytest.mark.asyncio
@@ -528,4 +540,5 @@ async def test_delete_and_redownload_same_file(
     wait_for_file_to_be_created(mock_file_name)
     verify_file(mock_file_name, expected_content.decode())
 
-    await dm.shutdown()
+    future = async_thread_runner.submit(dm.shutdown())
+    future.result()

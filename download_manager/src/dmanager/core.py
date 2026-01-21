@@ -100,24 +100,42 @@ class DownloadManager:
         ))
 
     async def shutdown(self):
+        if self._session is not None:
+            try:
+                await self._session.close()
+            except asyncio.CancelledError:
+                pass
+
         for task_id in self._tasks:
             self._tasks[task_id].cancel()
+            try: 
+                await self._tasks[task_id]
+            except asyncio.CancelledError:
+                pass
 
         del self._tasks
 
         for task_id in self._task_pools:
             for task in self._task_pools[task_id]:
                 task.cancel()
+                try:
+                    await task
+                except asyncio.CancelledError:
+                    pass
+
         
         del self._task_pools
         
         for task_id in self._preallocate_tasks:
             if not self._preallocate_tasks[task_id].done():
                 self._preallocate_tasks[task_id].cancel()
+                try:
+                    await self._preallocate_tasks[task_id]
+                except asyncio.CancelledError:
+                    pass
 
-        if self._session is not None:
-            await self._session.close()
-                
+        
+        del self._preallocate_tasks                
     
     def get_downloads(self) -> Dict[int, DownloadMetadata]:
         return self._downloads
@@ -451,11 +469,12 @@ class DownloadManager:
 
         async with self._session.head(download.url, timeout=aiohttp.ClientTimeout(total=300)) as resp:
             if "ETag" in resp.headers:
+                etag = resp.headers["ETag"].strip('"')
                 if download.etag == None:
-                    download.etag = resp.headers["ETag"].strip('"')
-                elif resp.headers["ETag"].strip('"') != download.etag:
+                    download.etag = etag
+                elif etag != download.etag:
                     logging.debug(f"Etag changed for {download.task_id=}, {download.url=}, {download.output_file=}. Restarting download from scratch.")
-                    download.etag = resp.headers["ETag"][1:-1]
+                    download.etag = etag
                     if os.path.exists(download.output_file):
                         os.remove(download.output_file)
                         download.downloaded_bytes = 0
@@ -471,7 +490,7 @@ class DownloadManager:
                         download.downloaded_bytes = 0
 
             if "Accept-Ranges" in resp.headers:
-                download.server_supports_http_range = resp.headers["Accept-Ranges"] == "bytes"
+                download.server_supports_http_range = resp.headers["Accept-Ranges"].lower() == "bytes"
             
             if download.output_file == "":
                 download.output_file = datetime.now().strftime("%m_%d_%Y_%H_%M_%S")
@@ -594,7 +613,7 @@ class DownloadManager:
                 next_write_byte = start_bytes
                 
                 headers = {
-                    "Range": f"bytes={start_bytes}-{end_bytes}"
+                    "Range": f"bytes={start_bytes}-{end_bytes - 1}"
                 }
 
                 last_running_update = datetime.now() - self._parallel_running_event_update_rate_seconds
@@ -690,6 +709,7 @@ class DownloadManager:
                         output_file=download.output_file,
                     ))
                     del self._task_pools[download.task_id]
+                    del self._data_queues[download.task_id]
                 return
             except Exception as err:
                 if next_write_byte != end_bytes:
