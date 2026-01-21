@@ -172,10 +172,7 @@ async def test_delete_from_pending_state():
 
     await dm.delete_download(task_id, remove_file=False)
 
-    assert task_id not in dm.get_downloads()
-
-    future = async_thread_runner.submit(dm.shutdown())
-    future.result()
+    assert task_id not in dm.get_downloads()    
 
 @pytest.mark.asyncio
 async def test_delete_from_running_state(async_thread_runner, test_file_setup_and_cleanup, create_mock_response_and_set_mock_session):

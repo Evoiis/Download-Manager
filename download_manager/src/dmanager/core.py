@@ -566,9 +566,11 @@ class DownloadManager:
             current_byte = 0
             while current_byte < download.file_size_bytes:
                 current_byte += increment
-                if current_byte > download.file_size_bytes:
+                if current_byte >= download.file_size_bytes:
                     current_byte = download.file_size_bytes
-                self._data_queues[task_id].put_nowait((prev_bytes, current_byte))
+                    self._data_queues[task_id].put_nowait((prev_bytes, current_byte))
+                else:
+                    self._data_queues[task_id].put_nowait((prev_bytes, current_byte - 1))
                 prev_bytes = current_byte           
             
 
@@ -613,7 +615,7 @@ class DownloadManager:
                 next_write_byte = start_bytes
                 
                 headers = {
-                    "Range": f"bytes={start_bytes}-{end_bytes - 1}"
+                    "Range": f"bytes={start_bytes}-{end_bytes}"
                 }
 
                 last_running_update = datetime.now() - self._parallel_running_event_update_rate_seconds

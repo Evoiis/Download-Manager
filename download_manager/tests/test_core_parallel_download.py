@@ -23,10 +23,10 @@ async def test_n_worker_parallel_download_coroutine(async_thread_runner, create_
     RANGE_SIZE = 1048576
 
     data = {
-        "1048576":  list(b"a" * RANGE_SIZE ),
-        "2097152":  list(b"b" * RANGE_SIZE ),
-        "3145728":  list(b"c" * RANGE_SIZE ),
-        "4194304": list(b"d" * RANGE_SIZE)
+        str(RANGE_SIZE - 1):  list(b"a" * RANGE_SIZE ),
+        str((RANGE_SIZE * 2) - 1):  list(b"b" * RANGE_SIZE ),
+        str((RANGE_SIZE * 3) - 1):  list(b"c" * RANGE_SIZE ),
+        str((RANGE_SIZE * 4)): list(b"d" * RANGE_SIZE)
     }
 
 
@@ -73,12 +73,12 @@ async def test_parallel_download_pause(async_thread_runner, create_parallel_mock
     mock_file_name = "test_file.txt"
     test_file_setup_and_cleanup(mock_file_name)
 
-    
+    RANGE_SIZE = 1048576
     data = {
-        "1048576":  list(b"abcdeabcdeabcdeabcdeabcde"),
-        "2097152":  list(b"ghijkghijkghijkghijkghijk"),
-        "3145728":  list(b"mnopqmnopqmnopqmnopqmnopq"),
-        "4194304": list(b"asdfeasdfeasdfeasdfeasdfe")
+        str(RANGE_SIZE - 1):  list(b"a" * RANGE_SIZE ),
+        str((RANGE_SIZE * 2) - 1):  list(b"b" * RANGE_SIZE ),
+        str((RANGE_SIZE * 3) - 1):  list(b"c" * RANGE_SIZE ),
+        str((RANGE_SIZE * 4)): list(b"d" * RANGE_SIZE)
     }
 
     mock_response = create_parallel_mock_response_and_set_mock_session(
@@ -122,10 +122,10 @@ async def test_parallel_download_resume(async_thread_runner, create_parallel_moc
 
     RANGE_SIZE = 1048576
     data = {
-        "1048576":  list(b"a" * RANGE_SIZE ),
-        "2097152":  list(b"b" * RANGE_SIZE ),
-        "3145728":  list(b"c" * RANGE_SIZE ),
-        "4194304": list(b"d" * RANGE_SIZE)
+        str(RANGE_SIZE - 1):  list(b"a" * RANGE_SIZE ),
+        str((RANGE_SIZE * 2) - 1):  list(b"b" * RANGE_SIZE ),
+        str((RANGE_SIZE * 3) - 1):  list(b"c" * RANGE_SIZE ),
+        str((RANGE_SIZE * 4)): list(b"d" * RANGE_SIZE)
     }
 
     mock_response = create_parallel_mock_response_and_set_mock_session(
@@ -186,10 +186,10 @@ async def test_parallel_download_delete_running(async_thread_runner, create_para
     
     RANGE_SIZE = 1048576
     data = {
-        "1048576":  list(b"a" * RANGE_SIZE),
-        "2097152":  list(b"b" * RANGE_SIZE),
-        "3145728":  list(b"c" * RANGE_SIZE),
-        "4194304": list(b"d" * RANGE_SIZE)
+        str(RANGE_SIZE - 1):  list(b"a" * RANGE_SIZE ),
+        str((RANGE_SIZE * 2) - 1):  list(b"b" * RANGE_SIZE ),
+        str((RANGE_SIZE * 3) - 1):  list(b"c" * RANGE_SIZE ),
+        str((RANGE_SIZE * 4)): list(b"d" * RANGE_SIZE)
     }
 
     mock_response = create_parallel_mock_response_and_set_mock_session(
@@ -235,10 +235,10 @@ async def test_parallel_download_delete_completed(async_thread_runner, create_pa
     
     RANGE_SIZE = 1048576
     data = {
-        "1048576":  list(b"a" * RANGE_SIZE),
-        "2097152":  list(b"b" * RANGE_SIZE),
-        "3145728":  list(b"c" * RANGE_SIZE),
-        "4194304": list(b"d" * RANGE_SIZE)
+        str(RANGE_SIZE - 1):  list(b"a" * RANGE_SIZE ),
+        str((RANGE_SIZE * 2) - 1):  list(b"b" * RANGE_SIZE ),
+        str((RANGE_SIZE * 3) - 1):  list(b"c" * RANGE_SIZE ),
+        str((RANGE_SIZE * 4)): list(b"d" * RANGE_SIZE)
     }
 
     mock_response = create_parallel_mock_response_and_set_mock_session(
@@ -292,10 +292,10 @@ async def test_multiple_simultaneous_parallel_download(async_thread_runner, crea
 
     RANGE_SIZE = 1048576
     data = {
-        "1048576":  list(b"a" * RANGE_SIZE),
-        "2097152":  list(b"b" * RANGE_SIZE),
-        "3145728":  list(b"c" * RANGE_SIZE),
-        "4194304": list(b"d" * RANGE_SIZE)
+        str(RANGE_SIZE - 1):  list(b"a" * RANGE_SIZE ),
+        str((RANGE_SIZE * 2) - 1):  list(b"b" * RANGE_SIZE ),
+        str((RANGE_SIZE * 3) - 1):  list(b"c" * RANGE_SIZE ),
+        str((RANGE_SIZE * 4)): list(b"d" * RANGE_SIZE)
     }
 
     mock_responses = create_multiple_parallel_mock_response_and_mock_sessions({
