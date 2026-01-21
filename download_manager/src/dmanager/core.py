@@ -46,7 +46,7 @@ class DownloadEvent:
         self.time = datetime.now()
 
 @dataclass
-class DownloadMetadata:
+class DownloadMetadata:``
     task_id: int
     url: str
     output_file: str
@@ -283,7 +283,7 @@ class DownloadManager:
             file_size_on_disk = os.path.getsize(download.output_file)
             logging.debug(f"Found partially allocated file, resume from {file_size_on_disk=}")
         next_write_byte = file_size_on_disk
-        async with aiofiles.open(download.output_file, "wb") as f:
+        async with aiofiles.open(download.output_file, "ab") as f:
             while next_write_byte < download.file_size_bytes:
                 await f.seek(next_write_byte)
                 chunk_size = min(KIBIBYTE_256, download.file_size_bytes - next_write_byte)
