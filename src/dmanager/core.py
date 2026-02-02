@@ -322,7 +322,6 @@ class DownloadManager:
                 state=download.state,
                 output_file=download.output_file
             ))
-            del self._tasks[download.task_id]
             return False
         self._tasks[download.task_id] = asyncio.create_task(self._download_file_coroutine(download))
 
@@ -396,6 +395,7 @@ class DownloadManager:
             tb = traceback.format_exc()
             logging.error(f"Traceback: {tb}")
             await self._log_and_share_error_event(download, err)
+            return False
 
     async def delete_download(self, task_id: int, remove_file: bool = False) -> bool:
         """
