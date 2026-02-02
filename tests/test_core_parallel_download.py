@@ -61,7 +61,7 @@ async def test_n_worker_parallel_download_coroutine(async_thread_runner, create_
 
     
     future = async_thread_runner.submit(dm.shutdown())
-    future.result()
+    future.result(timeout=15)
 
 
 @pytest.mark.asyncio
@@ -108,7 +108,7 @@ async def test_parallel_download_pause(async_thread_runner, create_parallel_mock
         await wait_for_state(dm, task_id, DownloadState.PAUSED)
     
     future = async_thread_runner.submit(dm.shutdown())
-    future.result()
+    future.result(timeout=15)
 
 
 @pytest.mark.asyncio
@@ -170,7 +170,7 @@ async def test_parallel_download_resume(async_thread_runner, create_parallel_moc
     )
     
     future = async_thread_runner.submit(dm.shutdown())
-    future.result()
+    future.result(timeout=15)
 
 
 
@@ -221,7 +221,7 @@ async def test_parallel_download_delete_running(async_thread_runner, create_para
     assert task_id not in dm._task_pools
 
     future = async_thread_runner.submit(dm.shutdown())
-    future.result()
+    future.result(timeout=15)
 
 @pytest.mark.asyncio
 async def test_parallel_download_delete_completed(async_thread_runner, create_parallel_mock_response_and_set_mock_session, test_file_setup_and_cleanup):
@@ -276,7 +276,7 @@ async def test_parallel_download_delete_completed(async_thread_runner, create_pa
     )
 
     future = async_thread_runner.submit(dm.shutdown())
-    future.result()
+    future.result(timeout=15)
 
 @pytest.mark.asyncio
 async def test_multiple_simultaneous_parallel_download(async_thread_runner, create_multiple_parallel_mock_response_and_mock_sessions, test_multiple_file_setup_and_cleanup):
@@ -347,7 +347,7 @@ async def test_multiple_simultaneous_parallel_download(async_thread_runner, crea
     )
 
     future = async_thread_runner.submit(dm.shutdown())
-    future.result()
+    future.result(timeout=15)
 
 @pytest.mark.asyncio
 async def test_core_file_preallocation(test_file_setup_and_cleanup):
@@ -404,7 +404,7 @@ async def test_parallel_pause_during_preallocate(async_thread_runner, create_par
 
     future = async_thread_runner.submit(dm.pause_download(task_id))
 
-    assert future.result() == True
+    assert future.result(timeout=15) == True
     await wait_for_state(dm, task_id, DownloadState.PAUSED)
     
     # Assumption: CPU/Disk won't be able to allocate 6 GIBIBYTES by this point
@@ -427,4 +427,4 @@ async def test_parallel_pause_during_preallocate(async_thread_runner, create_par
     assert current_file_size < os.path.getsize(mock_file_name)
     
     future = async_thread_runner.submit(dm.shutdown())
-    future.result()
+    future.result(timeout=15)

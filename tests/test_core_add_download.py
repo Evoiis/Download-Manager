@@ -74,7 +74,7 @@ async def test_empty_output_file_name(async_thread_runner, create_mock_response_
     assert dm.get_downloads()[task_id].output_file.endswith(".mp4")
     
     future = async_thread_runner.submit(dm.shutdown())
-    future.result()
+    future.result(timeout=15)
 
     await wait_for_state(dm, task_id, DownloadState.PAUSED)
 
@@ -83,21 +83,30 @@ async def test_empty_output_file_name(async_thread_runner, create_mock_response_
 
 
 @pytest.mark.asyncio
-async def test_input_invalid_url(async_thread_runner):
-    invalid_url = "http://exa mple.com"
-    # mock_file_name = "test_file.bin"
-    # test_file_setup_and_cleanup(mock_file_name)
+async def test_input_invalid_url(async_thread_runner, create_mock_response_and_set_mock_session):
+    mock_url = "https://example.com/file.bin"
+
+    create_mock_response_and_set_mock_session(
+        400,
+        {
+            "Content-Length": 100,
+            "Accept-Ranges": "bytes",
+            "ETag": '"ETAGSTRING"',
+            "Content-Type": "video/mp4"
+        },
+        mock_url
+    )    
 
     logging.debug("Add and start download")
     dm = DownloadManager()
-    task_id = dm.add_download(invalid_url, "")
+    task_id = dm.add_download(mock_url, "")
     future = async_thread_runner.submit(dm.start_download(task_id))
 
-    assert not future.result()
+    assert not future.result(timeout=15)
     await wait_for_state(dm, task_id, DownloadState.ERROR)
 
     future = async_thread_runner.submit(dm.shutdown())
-    future.result()
+    future.result(timeout=15)
     
 
 @pytest.mark.asyncio
@@ -132,7 +141,7 @@ async def test_invalid_test_id(async_thread_runner):
 
     dm = DownloadManager()
     future = async_thread_runner.submit(dm.start_download(invalid_task_id))
-    assert future.result() is False
+    assert future.result(timeout=15) is False
     
     assert await dm.start_download(invalid_task_id) is False
 
@@ -141,4 +150,4 @@ async def test_invalid_test_id(async_thread_runner):
     assert await dm.pause_download(invalid_task_id) is False
 
     future = async_thread_runner.submit(dm.shutdown())
-    future.result()
+    future.result(timeout=15)

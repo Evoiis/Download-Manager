@@ -9,7 +9,7 @@ from dmanager.asyncio_thread import AsyncioEventLoopThread
 
 
 class MockResponse:
-    def __init__(self, status, headers={}):
+    def __init__(self, status, headers=None):
         self.status = status
         self.headers = headers
         self.content = self
@@ -108,10 +108,6 @@ class MockParallelResponse():
     def end_response(self):
         self.stop = True
 
-    async def empty_queue(self):
-        while not self.queue.empty():
-            await self.queue.get()
-
 
 class MockParallelSession:
     def __init__(self, responses, request_queues):
@@ -192,7 +188,7 @@ def test_file_setup_and_cleanup(request):
             os.remove(test_file_name)
 
     def cleanup():
-        if os.path.exists(test_file_name):
+        if test_file_name != "" and os.path.exists(test_file_name):
             logging.debug(f"Cleaning up {test_file_name=}")
             os.remove(test_file_name)
     

@@ -266,7 +266,6 @@ class DownloadManager:
                     state=download.state,
                     output_file=download.output_file
                 ))
-                del self._tasks[download.task_id]
                 return
         try:
             if not os.path.exists(download.output_file) or (os.path.exists(download.output_file) and os.path.getsize(download.output_file) != download.file_size_bytes):
@@ -458,6 +457,7 @@ class DownloadManager:
             tb = traceback.format_exc()
             logging.error(f"Traceback: {tb}")
             await self._log_and_share_error_event(download, err)
+            return False
         
         if task_id in self._downloads:
             del self._downloads[task_id]
@@ -477,8 +477,8 @@ class DownloadManager:
         """
 
         async with self._session.head(download.url, timeout=aiohttp.ClientTimeout(total=self._request_timeout)) as resp:
-            if resp.status >= 300 and resp.status < 200:
-                raise Exception(f"Error: Header request received invalid response statue: {resp.status}.")
+            if resp.status >= 300 or resp.status < 200:
+                raise Exception(f"Error: Header request received invalid response status: {resp.status}.")
 
             if "ETag" in resp.headers:
                 etag = resp.headers["ETag"].strip('"')
@@ -528,6 +528,10 @@ class DownloadManager:
         Raises:
             Exception: If an oversized conflicting file exists.
         """
+
+        if download.file_size_bytes is None:
+            logging.warning(f"{download=} does not have file_size_bytes, so the program cannot evaluate if the complete file is on disk.")
+            return False
 
         output_file_size = os.path.getsize(download.output_file) if os.path.exists(download.output_file) else 0
         if output_file_size != 0:
@@ -836,5 +840,7 @@ class DownloadManager:
             tb = traceback.format_exc()
             logging.error(f"Traceback: {tb}")
             await self._log_and_share_error_event(download, err)
+            if download.task_id in self._tasks:
+                del self._tasks[download.task_id]
 
 __all__ = ["DownloadManager", "DownloadMetadata", "DownloadState", "DownloadEvent"]

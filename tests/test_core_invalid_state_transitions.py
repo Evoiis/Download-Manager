@@ -37,12 +37,12 @@ async def test_start_in_running_state(async_thread_runner, test_file_setup_and_c
 
     future = async_thread_runner.submit(dm.start_download(task_id))
 
-    assert future.result() is False, "start_download should have returned False"
+    assert future.result(timeout=15) is False, "start_download should have returned False"
     mock_response.end_response()
     await wait_for_state(dm, task_id, DownloadState.COMPLETED)
 
     future = async_thread_runner.submit(dm.shutdown())
-    future.result()
+    future.result(timeout=15)
 
 @pytest.mark.asyncio
 async def test_start_in_completed_state(async_thread_runner, test_file_setup_and_cleanup, create_mock_response_and_set_mock_session):
@@ -77,10 +77,10 @@ async def test_start_in_completed_state(async_thread_runner, test_file_setup_and
     await wait_for_state(dm, task_id, DownloadState.COMPLETED)
 
     future = async_thread_runner.submit(dm.start_download(task_id))
-    assert future.result() is False, "start_download should have returned False"
+    assert future.result(timeout=15) is False, "start_download should have returned False"
 
     future = async_thread_runner.submit(dm.shutdown())
-    future.result()
+    future.result(timeout=15)
 
 @pytest.mark.asyncio
 async def test_start_in_paused_state(async_thread_runner, test_file_setup_and_cleanup, create_mock_response_and_set_mock_session):
@@ -120,10 +120,10 @@ async def test_start_in_paused_state(async_thread_runner, test_file_setup_and_cl
 
     future = async_thread_runner.submit(dm.start_download(task_id))
 
-    assert future.result()
+    assert future.result(timeout=15)
 
     future = async_thread_runner.submit(dm.shutdown())
-    future.result()
+    future.result(timeout=15)
 # TEST_RESUME ------------------------------------------------------------
 
 @pytest.mark.asyncio
@@ -157,12 +157,12 @@ async def test_resume_in_running_state(async_thread_runner, test_file_setup_and_
     wait_for_file_to_be_created(mock_file_name)
 
     future = async_thread_runner.submit(dm.start_download(task_id))    
-    assert future.result() is False, "start_download should have returned False"
+    assert future.result(timeout=15) is False, "start_download should have returned False"
 
     mock_response.end_response()
     await wait_for_state(dm, task_id, DownloadState.COMPLETED)
     future = async_thread_runner.submit(dm.shutdown())
-    future.result()
+    future.result(timeout=15)
 
 @pytest.mark.asyncio
 async def test_resume_completed_download(async_thread_runner, test_file_setup_and_cleanup, create_mock_response_and_set_mock_session):
@@ -197,10 +197,10 @@ async def test_resume_completed_download(async_thread_runner, test_file_setup_an
     await wait_for_state(dm, task_id, DownloadState.COMPLETED)
 
     future = async_thread_runner.submit(dm.start_download(task_id))    
-    assert future.result() is False, "start_download should have returned False"
+    assert future.result(timeout=15) is False, "start_download should have returned False"
 
     future = async_thread_runner.submit(dm.shutdown())
-    future.result()
+    future.result(timeout=15)
 
 # TEST_PAUSE ------------------------------------------------------------
 
@@ -237,10 +237,10 @@ async def test_pause_completed_download(async_thread_runner, test_file_setup_and
     await wait_for_state(dm, task_id, DownloadState.COMPLETED)
 
     future = async_thread_runner.submit(dm.pause_download(task_id))
-    assert future.result() is False, "pause_download should have returned False"
+    assert future.result(timeout=15) is False, "pause_download should have returned False"
 
     future = async_thread_runner.submit(dm.shutdown())
-    future.result()
+    future.result(timeout=15)
 
 @pytest.mark.asyncio
 async def test_pause_in_paused_state(async_thread_runner, test_file_setup_and_cleanup, create_mock_response_and_set_mock_session):
@@ -279,10 +279,10 @@ async def test_pause_in_paused_state(async_thread_runner, test_file_setup_and_cl
     await wait_for_state(dm, task_id, DownloadState.PAUSED)
 
     future = async_thread_runner.submit(dm.pause_download(task_id))
-    assert future.result() is False, "pause_download should have returned False"
+    assert future.result(timeout=15) is False, "pause_download should have returned False"
 
     future = async_thread_runner.submit(dm.shutdown())
-    future.result()
+    future.result(timeout=15)
 
 @pytest.mark.asyncio
 async def test_pause_in_pending_state(async_thread_runner, test_file_setup_and_cleanup, create_mock_response_and_set_mock_session):
@@ -307,10 +307,10 @@ async def test_pause_in_pending_state(async_thread_runner, test_file_setup_and_c
     task_id = dm.add_download(mock_url, mock_file_name)
 
     future = async_thread_runner.submit(dm.pause_download(task_id))
-    assert future.result() is False, "pause_download should have returned False"
+    assert future.result(timeout=15) is False, "pause_download should have returned False"
 
     future = async_thread_runner.submit(dm.shutdown())
-    future.result()
+    future.result(timeout=15)
 
 @pytest.mark.asyncio
 async def test_pause_in_error_state(async_thread_runner, create_mock_response_and_set_mock_session, test_file_setup_and_cleanup):
@@ -340,8 +340,8 @@ async def test_pause_in_error_state(async_thread_runner, create_mock_response_an
     logging.debug("Download is now in error state, now running pause_download")
 
     future = async_thread_runner.submit(dm.pause_download(task_id))
-    assert future.result() is False, "pause_download should have returned False"
+    assert future.result(timeout=15) is False, "pause_download should have returned False"
 
     future = async_thread_runner.submit(dm.shutdown())
-    future.result()
+    future.result(timeout=15)
 

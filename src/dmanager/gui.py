@@ -92,7 +92,13 @@ class DownloadManagerGUI:
 
         if event.state == DownloadState.DELETED:
             self.table.delete(self.task_id_to_table_row[event.task_id])
-            del self.task_id_to_table_row[event.task_id]
+            if event.task_id in self.task_id_to_table_row:
+                del self.task_id_to_table_row[event.task_id]
+            
+            for task_id, worker_id in list(self.task_id_and_worker_id_to_table_row.keys()):
+                if task_id == event.task_id:
+                    del self.task_id_and_worker_id_to_table_row[(task_id, worker_id)]
+
 
         elif event.worker_id is not None:
             if (event.task_id, event.worker_id) in self.task_id_and_worker_id_to_table_row:

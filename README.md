@@ -19,7 +19,7 @@ A simple python download manager for Windows.
 
 ### Tests
 
-Run `pytest` from /Download_Manager folder
+Run `pytest` from repo root
 
 Use `-k <test or test_file name>` option to choose a specific test or test_file to run
 Use `--log-cli-level=INFO` option to mute debug log messages
