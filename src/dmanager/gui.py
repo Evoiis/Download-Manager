@@ -165,6 +165,10 @@ class DownloadManagerGUI:
             file_name
         )
 
+        if not task_id:
+            # TODO Indicate to user URL was invalid.
+            return
+
         self.task_id_to_table_row[task_id] = self.table.insert(
             "",
             tk.END,

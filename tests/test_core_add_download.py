@@ -82,31 +82,52 @@ async def test_empty_output_file_name(async_thread_runner, create_mock_response_
 
 
 @pytest.mark.asyncio
-async def test_input_invalid_url(async_thread_runner, create_mock_response_and_set_mock_session):
-    mock_url = "https://example.com/file.bin"
-
-    create_mock_response_and_set_mock_session(
-        400,
-        {
-            "Content-Length": 100,
-            "Accept-Ranges": "bytes",
-            "ETag": '"ETAGSTRING"',
-            "Content-Type": "video/mp4"
-        },
-        mock_url
-    )    
+async def test_input_invalid_urls(async_thread_runner, create_mock_response_and_set_mock_session):
+    invalid_urls = [
+        "htt://example.com/file.bin",           # invalid scheme
+        "ftp://example.com/file.bin",           # unsupported scheme
+        "http:///example.com/file.bin",         # missing netloc
+        "https://",                             # empty host
+        "https://exa mple.com/file.bin",        # space in host
+        "https://example..com/file.bin",        # double dot in domain
+        "http://?query=param",                  # missing host
+        "://example.com/file.bin",              # missing scheme
+    ]
+    
 
     logging.debug("Add and start download")
     dm = DownloadManager()
-    task_id = dm.add_download(mock_url, "")
-    future = async_thread_runner.submit(dm.start_download(task_id))
-
-    assert not future.result(timeout=15)
-    await wait_for_state(dm, task_id, DownloadState.ERROR)
+    for invalid_url in invalid_urls:
+        assert dm.add_download(invalid_url, "") == None, f"Unexpected url passed validation: {invalid_url}"
 
     future = async_thread_runner.submit(dm.shutdown())
     future.result(timeout=15)
+
+@pytest.mark.asyncio
+async def test_add_download_windows_reserved_names():
+    """Test Windows reserved filename handling"""
+    dm = DownloadManager()
     
+    reserved = ["CON.txt", "PRN.doc", "AUX", "NUL.bin"]
+    
+    for name in reserved:
+        task_id = dm.add_download("https://example.com/file.bin", name)
+        download = dm.get_downloads()[task_id]
+        # Should have been cleared
+        assert download.output_file == ""
+
+@pytest.mark.asyncio
+async def test_add_download_negative_workers():
+    """Test n_workers validation"""
+    dm = DownloadManager()
+    
+    task_id = dm.add_download("https://example.com/file.bin", "file.txt", n_workers=-5)
+    assert task_id is not None
+    
+    download = dm.get_downloads()[task_id]
+    # Should have been reset to None or clamped
+    assert download.parallel_metadata is None or download.parallel_metadata.n_workers > 0
+
 
 @pytest.mark.asyncio
 async def test_input_already_used_output_file():

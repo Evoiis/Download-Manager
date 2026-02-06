@@ -15,6 +15,7 @@ import aiofiles
 import traceback
 import time
 import uuid
+from urllib.parse import urlparse
 
 from .constants import ONE_GIBIBYTE, CHUNK_SIZE, SEGMENT_SIZE, PREALLOCATE_CHUNK_SIZE
 from .speedcalculator import SpeedCalculator
@@ -243,7 +244,7 @@ class DownloadManager:
         else:
             return self.events_queue.get_nowait()            
 
-    def add_download(self, url: str, output_file: Optional[str] = "", n_workers: Optional[int] =None) -> int:
+    def add_download(self, url: str, output_file: Optional[str] = "", n_workers: Optional[int] =None) -> int | None:
         """
         Register a new download task.
         NOT threadsafe, only call this from one thread.
@@ -255,12 +256,29 @@ class DownloadManager:
         Returns:
             int: unique task id
         """
-        if n_workers == 0:
+        if n_workers is not None and n_workers <= 0:
             logging.warning("[add_download] Received n_workers=0, defaulting to None")
             n_workers = None
 
-        task_id = self._iterate_and_get_id()
+        # Validate url
+        parsed = urlparse(url)
+        if parsed.scheme not in ("http", "https") or parsed.netloc == "":
+            logging.warning(f"[add_download] Received invalid url: {url}")
+            return None
+        hostname = parsed.netloc.split(':')[0]
+    
+        # Reject spaces, invalid chars, consecutive dots, etc.
+        if ' ' in hostname or '..' in hostname:
+            logging.warning(f"[add_download] Received invalid url: {url}")
+            return None
+        if not re.match(r'^[a-zA-Z0-9.-]+$', hostname):
+            logging.warning(f"[add_download] Received invalid url: {url}")
+            return None
+        if hostname.startswith(('.', '-')) or hostname.endswith(('.', '-')):
+            logging.warning(f"[add_download] Received invalid url: {url}")
+            return None
 
+        # Validate output_file name
         for download in self._downloads.values():
             if download.output_file == output_file:
                 output_file = ""
@@ -269,8 +287,18 @@ class DownloadManager:
         if os.path.exists(output_file):
             output_file = ""
 
-        output_file = re.sub(r'[\\/:*?"<>|]', "", output_file).rstrip(" .")
+        # Sanitize filename
+        if output_file:
+            output_file = re.sub(r'[\x00-\x1f\\/:*?"<>|]', "", output_file).rstrip(" .")
+            # Windows reserved names check
+            RESERVED = {'CON', 'PRN', 'AUX', 'NUL', 'COM1', 'COM2', 'COM3', 'COM4',
+                        'LPT1', 'LPT2', 'LPT3'}
+            if output_file.upper().split('.')[0] in RESERVED:
+                logging.warning(f"[add_download] Reserved filename: '{output_file}', will auto-generate")
+                output_file = ""
 
+        # Create download task
+        task_id = self._iterate_and_get_id()
         if task_id in self._downloads:
             raise Exception(f"Error: Unexpected id in download manager downloads. {task_id=}, Downloads: {self._downloads}")
 

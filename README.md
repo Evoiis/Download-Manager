@@ -8,9 +8,12 @@ A simple python download manager for Windows.
 - Asynchronous downloads using aioHTTP
 - Download Manager controls: Start/Resume/Pause/Delete
 - Download Manager Test Suite
-- Simple Stateless GUI to add, control, and check progress of downloads
+- Simple Stateless GUI to add and control downloads
+    - GUI allows adding direct download links and setting the output file name
+    - GUI shows progress of download including, progress, speed and more
 - Single File Parallel Download
     - Using multiple connections to download one file faster
+
 
 # Usage
 
@@ -29,6 +32,7 @@ Use `--log-cli-level=INFO` option to mute debug log messages
 - Auto-shutdown/Keep-on Computer Logic
 - Download Speed limiter
 - Save metadata to file: Persist preferences and download_metadata between restarts
+- Browser extension to grab direct download links from websites when browsing
 
 - Separate ERROR from state
     - State should explain what the manager is doing with a certain download task
