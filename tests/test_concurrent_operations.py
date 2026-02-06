@@ -256,6 +256,50 @@ async def test_concurrent_pause_operations(async_thread_runner, create_mock_resp
     future.result(timeout=15)
 
 
+
+@pytest.mark.asyncio
+async def test_concurrent_delete_operations(async_thread_runner, create_mock_response_and_set_mock_session, test_file_setup_and_cleanup):
+    """Test multiple simultaneous pause_download calls"""
+    chunks = [b"a" * 1024]
+    mock_url = "https://example.com/file.bin"
+    mock_file_name = "test_file.bin"
+    test_file_setup_and_cleanup(mock_file_name)
+
+    mock_response = create_mock_response_and_set_mock_session(
+        206,
+        {
+            "Content-Length": str(len(chunks[0])),
+            "Accept-Ranges": "bytes"
+        },
+        mock_url
+    )
+
+    dm = DownloadManager()
+    task_id = dm.add_download(mock_url, mock_file_name)
+    async_thread_runner.submit(dm.start_download(task_id))
+
+    await wait_for_state(dm, task_id, DownloadState.RUNNING)
+    await mock_response.insert_chunk(chunks[0])
+    
+    # Try to pause multiple times concurrently
+    future1 = async_thread_runner.submit(dm.delete_download(task_id))
+    future2 = async_thread_runner.submit(dm.delete_download(task_id))
+    future3 = async_thread_runner.submit(dm.delete_download(task_id))
+    
+    result1 = future1.result(timeout=15)
+    result2 = future2.result(timeout=15)
+    result3 = future3.result(timeout=15)
+    
+    # At least one should succeed
+    results = [result1, result2, result3]
+    assert True in results
+    
+    await wait_for_state(dm, task_id, DownloadState.DELETED)
+
+    future = async_thread_runner.submit(dm.shutdown())
+    future.result(timeout=15)
+
+
 @pytest.mark.asyncio
 async def test_start_and_pause_race(async_thread_runner, create_mock_response_and_set_mock_session, test_file_setup_and_cleanup):
     """Test race between start and pause operations"""

@@ -1,6 +1,7 @@
 import time
 import os
 import logging
+import asyncio
 
 from typing import Dict, Tuple
 
@@ -19,6 +20,8 @@ async def wait_for_state(dm, task_id, expected_state, timeout_sec=DEFAULT_TIMEOU
             logging.debug(f"WFS: Event received: {event}")
             if event.task_id == task_id and event.state == expected_state:
                 return event
+        else:
+            await asyncio.sleep(0.5)
             
     raise AssertionError(f"Timed out while waiting for {task_id=} to reach {expected_state}.")
 
@@ -36,6 +39,8 @@ async def wait_for_multiple_states(dm, states: Dict[Tuple[int, DownloadState], i
 
                 if len(states) == 0:
                     return
+        else:
+            await asyncio.sleep(0.5)
     raise AssertionError(f"Timed out while waiting for states to be reached. {states=}")
 
 def wait_for_file_to_be_created(file_name, timeout_sec=DEFAULT_TIMEOUT):
