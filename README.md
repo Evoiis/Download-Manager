@@ -6,13 +6,14 @@ A simple python download manager for Windows.
 # Features
 
 - Asynchronous downloads using aioHTTP
-- Download Manager controls: Start/Resume/Pause/Delete
+- Download Manager download controls: Start/Resume/Pause/Delete
 - Download Manager Test Suite
+- Single File Parallel Download
+    - Using multiple connections to download one file faster
+
 - Simple Stateless GUI to add and control downloads
     - GUI allows adding direct download links and setting the output file name
     - GUI shows progress of download including, progress, speed and more
-- Single File Parallel Download
-    - Using multiple connections to download one file faster
 
 
 # Usage

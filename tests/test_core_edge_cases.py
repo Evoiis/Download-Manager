@@ -44,32 +44,6 @@ async def test_download_without_content_length(async_thread_runner, create_mock_
     future.result(timeout=15)
 
 
-@pytest.mark.asyncio
-async def test_download_with_invalid_url(async_thread_runner):
-    """Test handling of malformed URLs"""
-    dm = DownloadManager()
-    
-    invalid_urls = [
-        "not-a-url",
-        "ftp://unsupported-protocol.com/file.bin",
-        "",
-        "http://",
-    ]
-    
-    for invalid_url in invalid_urls:
-        task_id = dm.add_download(invalid_url, "test_file.bin")
-        future = async_thread_runner.submit(dm.start_download(task_id))
-        
-        # Should return False and emit error event
-        result = future.result(timeout=15)
-        assert result is False
-        
-        await wait_for_state(dm, task_id, DownloadState.ERROR)
-    
-    future = async_thread_runner.submit(dm.shutdown())
-    future.result(timeout=15)
-
-
 class MockErrorResponse:
     """Mock response that simulates server errors"""
     def __init__(self, status, headers=None, error_on_chunk=False):

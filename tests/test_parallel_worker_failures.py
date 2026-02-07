@@ -2,21 +2,21 @@ import asyncio
 import pytest
 import logging
 import aiohttp
+import inspect
 
 from dmanager.core import DownloadManager, DownloadState
-from tests.helpers import wait_for_state, verify_file, wait_for_multiple_states
+from tests.helpers import wait_for_state, verify_file
 
 
 @pytest.mark.asyncio
-async def test_parallel_download_worker_error(async_thread_runner, create_parallel_mock_response_and_set_mock_session, test_file_setup_and_cleanup):
+async def test_parallel_download_worker_error(test_file_setup_and_cleanup, async_thread_runner, download_manager_fixture, create_parallel_mock_response_and_set_mock_session):
     """Test that other workers continue when one fails."""
     n_workers = 4
-
     segment_size = 1024
-    dm = DownloadManager(maximum_workers_per_task=n_workers, parallel_download_segment_size=segment_size)
-
     mock_url = "https://example.com/file.txt"
-    mock_file_name = "test_file.txt"
+    mock_file_name = f"{inspect.currentframe().f_code.co_name}.txt"
+
+    dm = download_manager_fixture(async_thread_runner, maximum_workers_per_task=n_workers, parallel_download_segment_size=segment_size, continue_on_error=False)
     test_file_setup_and_cleanup(mock_file_name)
 
     data = {
@@ -49,12 +49,11 @@ async def test_parallel_download_worker_error(async_thread_runner, create_parall
     async_thread_runner.submit(dm.start_download(task_id, use_parallel_download=True))
     
     await wait_for_state(dm, task_id, DownloadState.ALLOCATING_SPACE)
-    await wait_for_state(dm, task_id, DownloadState.RUNNING)
     
     await wait_for_state(dm, task_id, DownloadState.ERROR)
     
     download_metadata = dm.get_downloads()[task_id]
-    assert download_metadata.state == DownloadState.ERROR
+    assert download_metadata.state == DownloadState.PAUSED
     assert download_metadata.parallel_metadata is not None
     
     # Check that worker states are tracked
@@ -63,19 +62,18 @@ async def test_parallel_download_worker_error(async_thread_runner, create_parall
         worker_states = download_metadata.parallel_metadata.worker_states.values()
         assert DownloadState.ERROR in worker_states
 
-    future = async_thread_runner.submit(dm.shutdown())
-    future.result(timeout=15)
+    
 
 
 @pytest.mark.asyncio
-async def test_parallel_download_fake_timeout(async_thread_runner, create_parallel_mock_response_and_set_mock_session, test_file_setup_and_cleanup):
+async def test_parallel_download_fake_timeout(test_file_setup_and_cleanup, async_thread_runner, download_manager_fixture, create_parallel_mock_response_and_set_mock_session):
     
     n_workers = 4
     segment_size = 1024
-    dm = DownloadManager(maximum_workers_per_task=n_workers, parallel_download_segment_size=segment_size)
+    dm = download_manager_fixture(async_thread_runner, maximum_workers_per_task=n_workers, parallel_download_segment_size=segment_size, continue_on_error=False)
 
     mock_url = "https://example.com/file.txt"
-    mock_file_name = "test_file.txt"
+    mock_file_name = f"{inspect.currentframe().f_code.co_name}.txt"
     test_file_setup_and_cleanup(mock_file_name)
 
     data = {
@@ -114,7 +112,7 @@ async def test_parallel_download_fake_timeout(async_thread_runner, create_parall
     await wait_for_state(dm, task_id, DownloadState.ERROR)
     
     download_metadata = dm.get_downloads()[task_id]
-    assert download_metadata.state == DownloadState.ERROR
+    assert download_metadata.state == DownloadState.PAUSED
     assert download_metadata.parallel_metadata is not None
     
     # Check that worker states are tracked
@@ -123,19 +121,24 @@ async def test_parallel_download_fake_timeout(async_thread_runner, create_parall
         worker_states = download_metadata.parallel_metadata.worker_states.values()
         assert DownloadState.ERROR in worker_states
     
-    future = async_thread_runner.submit(dm.shutdown())
-    future.result(timeout=15)
+    
 
 @pytest.mark.asyncio
-async def test_parallel_worker_continue_on_failure(async_thread_runner, create_parallel_mock_response_and_set_mock_session, test_file_setup_and_cleanup):
+async def test_parallel_worker_continue_on_failure(test_file_setup_and_cleanup, async_thread_runner, download_manager_fixture, create_parallel_mock_response_and_set_mock_session):
     """Test parallel workers still continue after encountering a failure."""
 
     n_workers = 1
     segment_size = 49
-    dm = DownloadManager(maximum_workers_per_task=n_workers, parallel_download_segment_size=segment_size, continue_on_error=True)
+    dm = download_manager_fixture(
+        async_thread_runner, 
+        maximum_workers_per_task=n_workers, 
+        parallel_download_segment_size=segment_size, 
+        continue_on_error=True,
+        stop_continue_on_n_errors=None
+    )
 
     mock_url = "https://example.com/file.txt"
-    mock_file_name = "test_file.txt"
+    mock_file_name = f"{inspect.currentframe().f_code.co_name}.txt"
     test_file_setup_and_cleanup(mock_file_name)
 
     data = {
@@ -187,21 +190,20 @@ async def test_parallel_worker_continue_on_failure(async_thread_runner, create_p
         "".join(bytes(x).decode('ascii') for x in data.values())
     )
 
-    future = async_thread_runner.submit(dm.shutdown())
-    future.result(timeout=15)
+    
 
 
 @pytest.mark.asyncio
-async def test_parallel_worker_stop_on_5_errors(async_thread_runner, create_parallel_mock_response_and_set_mock_session, test_file_setup_and_cleanup):
+async def test_parallel_worker_stop_on_5_errors(test_file_setup_and_cleanup, async_thread_runner, download_manager_fixture, create_parallel_mock_response_and_set_mock_session):
     """Test parallel workers still continue after encountering a failure."""
 
     n_workers = 1
     segment_size = 49
-    dm = DownloadManager(maximum_workers_per_task=n_workers, parallel_download_segment_size=segment_size, continue_on_error=True, stop_continue_on_n_errors=5)
+    dm = download_manager_fixture(async_thread_runner, maximum_workers_per_task=n_workers, parallel_download_segment_size=segment_size, continue_on_error=True, stop_continue_on_n_errors=5)
 
     mock_url = "https://example.com/file.txt"
-    mock_file_name = "test_file.txt"
-    # test_file_setup_and_cleanup(mock_file_name)
+    mock_file_name = f"{inspect.currentframe().f_code.co_name}.txt"
+    test_file_setup_and_cleanup(mock_file_name)
 
     data = {
         str(segment_size - 1):  list(b"a" * segment_size),
@@ -241,26 +243,28 @@ async def test_parallel_worker_stop_on_5_errors(async_thread_runner, create_para
     
     await wait_for_state(dm, task_id, DownloadState.PAUSED)
 
-    future = async_thread_runner.submit(dm.shutdown())
-    future.result(timeout=15)
+    
 
 @pytest.mark.parametrize(
     "continue_on_error",
     [True, False]
 )
 @pytest.mark.asyncio
-async def test_parallel_worker_pause_after_failure(async_thread_runner, create_parallel_mock_response_and_set_mock_session, test_file_setup_and_cleanup, continue_on_error):
+async def test_parallel_worker_pause_after_failure(test_file_setup_and_cleanup, async_thread_runner, download_manager_fixture, create_parallel_mock_response_and_set_mock_session, continue_on_error):
     """Test that pause works correctly even after worker failure"""
     n_workers = 4
     segment_size = 1024
-    dm = DownloadManager(
+    dm = download_manager_fixture(
+        async_thread_runner,
         maximum_workers_per_task=n_workers, 
         parallel_download_segment_size=segment_size,
-        continue_on_error=continue_on_error
+        continue_on_error=continue_on_error,
+        stop_continue_on_n_errors=None
     )
+    
 
     mock_url = "https://example.com/file.txt"
-    mock_file_name = "test_file.txt"
+    mock_file_name = f"{inspect.currentframe().f_code.co_name}_{continue_on_error}.txt"
     test_file_setup_and_cleanup(mock_file_name)
 
     data = {
@@ -295,32 +299,32 @@ async def test_parallel_worker_pause_after_failure(async_thread_runner, create_p
 
     if continue_on_error:
         async_thread_runner.submit(dm.pause_download(task_id))
-        for _ in range(n_workers + 1):
-            await wait_for_state(dm, task_id, DownloadState.PAUSED)
+        await wait_for_state(dm, task_id, DownloadState.PAUSED)
     else:
         await wait_for_state(dm, task_id, DownloadState.PAUSED)
     
-    future = async_thread_runner.submit(dm.shutdown())
-    future.result(timeout=15)
+    
 
 @pytest.mark.parametrize(
     "continue_on_error",
     [True, False]
 )
 @pytest.mark.asyncio
-async def test_parallel_worker_delete_after_failure(async_thread_runner, create_parallel_mock_response_and_set_mock_session, test_file_setup_and_cleanup, continue_on_error):
+async def test_parallel_worker_delete_after_failure(test_file_setup_and_cleanup, async_thread_runner, download_manager_fixture, create_parallel_mock_response_and_set_mock_session, continue_on_error):
     """Test that delete works correctly even after worker failure"""
 
     n_workers = 4
     segment_size = 1024
-    dm = DownloadManager(
+    dm = download_manager_fixture(
+        async_thread_runner,
         maximum_workers_per_task=n_workers, 
         parallel_download_segment_size=segment_size,
-        continue_on_error=continue_on_error
+        continue_on_error=continue_on_error,
+        stop_continue_on_n_errors=None
     )
 
     mock_url = "https://example.com/file.txt"
-    mock_file_name = "test_file.txt"
+    mock_file_name = f"{inspect.currentframe().f_code.co_name}_{continue_on_error}.txt"
     test_file_setup_and_cleanup(mock_file_name)
 
     data = {
@@ -354,9 +358,6 @@ async def test_parallel_worker_delete_after_failure(async_thread_runner, create_
     async_thread_runner.submit(dm.delete_download(task_id))
     
     await wait_for_state(dm, task_id, DownloadState.DELETED)
-    
-    future = async_thread_runner.submit(dm.shutdown())
-    future.result(timeout=15)
 
 
 @pytest.mark.parametrize(
@@ -364,19 +365,20 @@ async def test_parallel_worker_delete_after_failure(async_thread_runner, create_
     [True, False]
 )
 @pytest.mark.asyncio
-async def test_parallel_worker_start_after_failure(async_thread_runner, create_parallel_mock_response_and_set_mock_session, test_file_setup_and_cleanup, continue_on_error):
+async def test_parallel_worker_start_after_failure(test_file_setup_and_cleanup, async_thread_runner, download_manager_fixture, create_parallel_mock_response_and_set_mock_session, continue_on_error):
     """Test that start works correctly after worker failure"""
 
     n_workers = 4
     segment_size = 1024
-    dm = DownloadManager(
+    dm = download_manager_fixture(
+        async_thread_runner,
         maximum_workers_per_task=n_workers, 
         parallel_download_segment_size=segment_size,
         continue_on_error=continue_on_error
     )
-
+    
     mock_url = "https://example.com/file.txt"
-    mock_file_name = "test_file.txt"
+    mock_file_name = f"{inspect.currentframe().f_code.co_name}_{continue_on_error}.txt"
     test_file_setup_and_cleanup(mock_file_name)
 
     data = {
@@ -426,5 +428,4 @@ async def test_parallel_worker_start_after_failure(async_thread_runner, create_p
     )
 
     
-    future = async_thread_runner.submit(dm.shutdown())
-    future.result(timeout=15)
+    

@@ -5,8 +5,10 @@ import logging
 import copy
 
 from typing import Dict
-from dmanager.asyncio_thread import AsyncioEventLoopThread
 
+from dmanager.asyncio_thread import AsyncioEventLoopThread
+from dmanager.core import DownloadManager
+from dmanager.constants import SEGMENT_SIZE
 
 class MockResponse:
     def __init__(self, status, headers=None):
@@ -150,12 +152,16 @@ class MockParallelSession:
         self.closed = True
         return
 
-
 @pytest.fixture
-def async_thread_runner():
+def async_thread_runner(request):
     runner = AsyncioEventLoopThread()
-    yield runner
-    runner.shutdown()
+    
+    def cleanup():
+        logging.debug("Async thread fixture shutting down.")
+        runner.shutdown()
+
+    request.addfinalizer(cleanup)
+    return runner
 
 @pytest.fixture
 def create_mock_response_and_set_mock_session(monkeypatch):
@@ -236,3 +242,44 @@ def test_multiple_file_setup_and_cleanup(request):
     request.addfinalizer(cleanup)
     yield setup
 
+@pytest.fixture
+def download_manager_fixture(request):
+    download_manager = None
+    runner = None
+
+    def setup(
+        async_runner: AsyncioEventLoopThread,
+        running_event_update_rate_seconds: int = 1, 
+        parallel_running_event_update_rate_seconds: int = 1, 
+        maximum_workers_per_task: int = 5, 
+        request_connect_timeout: float= 120.,
+        request_read_timeout: float= 60.,
+        request_total_timeout: float = None,
+        parallel_download_segment_size: int= SEGMENT_SIZE,
+        continue_on_error: bool= True,
+        stop_continue_on_n_errors: int | None=5
+    ):
+        nonlocal runner
+        nonlocal download_manager
+        runner = async_runner
+        download_manager = DownloadManager(
+            running_event_update_rate_seconds=running_event_update_rate_seconds,
+            parallel_running_event_update_rate_seconds=parallel_running_event_update_rate_seconds,
+            maximum_workers_per_task=maximum_workers_per_task,
+            request_connect_timeout=request_connect_timeout,
+            request_read_timeout=request_read_timeout,
+            request_total_timeout=request_total_timeout,
+            parallel_download_segment_size=parallel_download_segment_size,
+            continue_on_error=continue_on_error,
+            stop_continue_on_n_errors=stop_continue_on_n_errors
+        )
+        return download_manager
+
+    def cleanup():
+        logging.debug("Download Manager fixture cleanup.")
+        if download_manager:
+            future = runner.submit(download_manager.shutdown())
+            future.result(timeout=15)
+    
+    request.addfinalizer(cleanup)
+    yield setup

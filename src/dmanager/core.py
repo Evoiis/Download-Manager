@@ -196,6 +196,7 @@ class DownloadManager:
         self._continue_on_error = setting
     
     async def shutdown(self):
+        logging.info("Download Manager initializing shutdown.")
         all_tasks = []
         all_tasks.extend(self._tasks.values())
         all_tasks.extend(self._preallocate_tasks.values())
