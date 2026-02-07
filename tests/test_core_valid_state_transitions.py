@@ -2,6 +2,7 @@ import asyncio
 import pytest
 import os
 import logging
+import inspect
 
 from dmanager.core import DownloadManager, DownloadState
 from tests.helpers import wait_for_state, verify_file, wait_for_file_to_be_created
@@ -12,7 +13,7 @@ async def test_add_and_start_download(async_thread_runner, create_mock_response_
     chunks = [b"abc", b"def", b"ghi"]
     mock_url = "https://example.com/file.bin"
 
-    mock_file_name = "test_file.bin"
+    mock_file_name = f"{inspect.currentframe().f_code.co_name}.txt"
     test_file_setup_and_cleanup(mock_file_name)
 
     mock_response = create_mock_response_and_set_mock_session(
@@ -56,7 +57,7 @@ async def test_add_and_start_download(async_thread_runner, create_mock_response_
 async def test_pause_download(async_thread_runner, create_mock_response_and_set_mock_session, test_file_setup_and_cleanup):
     chunks = [b"abc", b"def", b"ghi"]
     mock_url = "https://example.com/file.bin"
-    mock_file_name = "test_file.bin"
+    mock_file_name = f"{inspect.currentframe().f_code.co_name}.txt"
     test_file_setup_and_cleanup(mock_file_name)
 
     mock_response = create_mock_response_and_set_mock_session(
@@ -107,7 +108,7 @@ async def test_pause_download(async_thread_runner, create_mock_response_and_set_
 async def test_resume_download(async_thread_runner, create_mock_response_and_set_mock_session, test_file_setup_and_cleanup):
     chunks = [b"abc", b"def", b"ghi"]
     mock_url = "https://example.com/file.bin"
-    mock_file_name = "test_file.bin"
+    mock_file_name = f"{inspect.currentframe().f_code.co_name}.txt"
     test_file_setup_and_cleanup(mock_file_name)
 
     mock_response = create_mock_response_and_set_mock_session(
@@ -164,7 +165,7 @@ async def test_resume_download(async_thread_runner, create_mock_response_and_set
 @pytest.mark.asyncio
 async def test_delete_from_pending_state():
     mock_url = "https://example.com/file.bin"
-    mock_file_name = "test_file.bin"
+    mock_file_name = f"{inspect.currentframe().f_code.co_name}.txt"
     dm = DownloadManager()
     task_id = dm.add_download(mock_url, mock_file_name)
 
@@ -178,7 +179,7 @@ async def test_delete_from_pending_state():
 async def test_delete_from_running_state(async_thread_runner, test_file_setup_and_cleanup, create_mock_response_and_set_mock_session):
     chunks = [b"abc", b"def", b"ghi"]
     mock_url = "https://example.com/file.bin"
-    mock_file_name = "test_file.bin"
+    mock_file_name = f"{inspect.currentframe().f_code.co_name}.txt"
     test_file_setup_and_cleanup(mock_file_name)
 
     mock_response = create_mock_response_and_set_mock_session(
@@ -215,7 +216,7 @@ async def test_delete_from_running_state(async_thread_runner, test_file_setup_an
 async def test_delete_from_paused_state(async_thread_runner, test_file_setup_and_cleanup, create_mock_response_and_set_mock_session):
     chunks = [b"abc", b"def", b"ghi"]
     mock_url = "https://example.com/file.bin"
-    mock_file_name = "test_file.bin"
+    mock_file_name = f"{inspect.currentframe().f_code.co_name}.txt"
     test_file_setup_and_cleanup(mock_file_name)
 
     mock_response = create_mock_response_and_set_mock_session(
@@ -256,7 +257,7 @@ async def test_delete_from_paused_state(async_thread_runner, test_file_setup_and
 async def test_delete_from_completed_state(async_thread_runner, test_file_setup_and_cleanup, create_mock_response_and_set_mock_session):
     chunks = [b"abc", b"def", b"ghi"]
     mock_url = "https://example.com/file.bin"
-    mock_file_name = "test_file.bin"
+    mock_file_name = f"{inspect.currentframe().f_code.co_name}.txt"
     test_file_setup_and_cleanup(mock_file_name)
 
     mock_response = create_mock_response_and_set_mock_session(
@@ -298,7 +299,7 @@ async def test_delete_from_completed_state(async_thread_runner, test_file_setup_
 async def test_two_mib_download(async_thread_runner, test_file_setup_and_cleanup, create_mock_response_and_set_mock_session):
     two_mib = b"a" * (2 * 1024 * 1024)
     mock_url = "https://example.com/file.bin"
-    mock_file_name = "test_file.bin"
+    mock_file_name = f"{inspect.currentframe().f_code.co_name}.txt"
     test_file_setup_and_cleanup(mock_file_name)
 
     mock_response = create_mock_response_and_set_mock_session(
@@ -331,7 +332,7 @@ async def test_two_mib_download(async_thread_runner, test_file_setup_and_cleanup
 async def test_two_mib_download_no_http_ranges(async_thread_runner, test_file_setup_and_cleanup, create_mock_response_and_set_mock_session):
     two_mib = b"a" * (2 * 1024 * 1024)
     mock_url = "https://example.com/file.bin"
-    mock_file_name = "test_file.bin"
+    mock_file_name = f"{inspect.currentframe().f_code.co_name}.txt"
     test_file_setup_and_cleanup(mock_file_name)
 
     mock_response = create_mock_response_and_set_mock_session(
@@ -370,7 +371,7 @@ async def test_delete_and_redownload_same_file(
     expected_content = b"".join(chunks)
 
     mock_url = "https://example.com/file.bin"
-    mock_file_name = "test_file.bin"
+    mock_file_name = f"{inspect.currentframe().f_code.co_name}.txt"
     test_file_setup_and_cleanup(mock_file_name)
 
     # First mock response

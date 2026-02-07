@@ -1,6 +1,7 @@
 import asyncio
 import pytest
 import aiohttp
+import inspect
 
 from dmanager.core import DownloadManager, DownloadState
 from tests.helpers import wait_for_state, verify_file, wait_for_file_to_be_created
@@ -11,7 +12,7 @@ async def test_download_without_content_length(async_thread_runner, create_mock_
     """Test behavior when server doesn't provide Content-Length header"""
     chunks = [b"abc", b"def", b"ghi"]
     mock_url = "https://example.com/file.bin"
-    mock_file_name = "test_file.bin"
+    mock_file_name = f"{inspect.currentframe().f_code.co_name}.txt"
     test_file_setup_and_cleanup(mock_file_name)
 
     mock_response = create_mock_response_and_set_mock_session(
@@ -82,7 +83,7 @@ class MockErrorResponse:
 async def test_download_server_500_error(monkeypatch, async_thread_runner, test_file_setup_and_cleanup):
     """Test handling of server errors during header request"""
     mock_url = "https://example.com/file.bin"
-    mock_file_name = "test_file.bin"
+    mock_file_name = f"{inspect.currentframe().f_code.co_name}.txt"
     test_file_setup_and_cleanup(mock_file_name)
 
     from tests.conftest import MockSession
@@ -107,7 +108,7 @@ async def test_download_server_500_error(monkeypatch, async_thread_runner, test_
 async def test_download_network_timeout(monkeypatch, async_thread_runner, test_file_setup_and_cleanup):
     """Test behavior when network request times out"""
     mock_url = "https://example.com/file.bin"
-    mock_file_name = "test_file.bin"
+    mock_file_name = f"{inspect.currentframe().f_code.co_name}.txt"
     test_file_setup_and_cleanup(mock_file_name)
 
     class MockTimeoutSession:
@@ -147,7 +148,7 @@ async def test_download_network_timeout(monkeypatch, async_thread_runner, test_f
 async def test_download_network_error_during_chunk(monkeypatch, async_thread_runner, test_file_setup_and_cleanup):
     """Test handling of network error during chunk download"""
     mock_url = "https://example.com/file.bin"
-    mock_file_name = "test_file.bin"
+    mock_file_name = f"{inspect.currentframe().f_code.co_name}.txt"
     test_file_setup_and_cleanup(mock_file_name)
 
     from tests.conftest import MockSession
@@ -175,7 +176,7 @@ async def test_download_server_redirect(create_mock_response_and_set_mock_sessio
     """
     chunks = [b"abc", b"def", b"ghi"]
     mock_url = "https://example.com/file.bin"
-    mock_file_name = "test_file.bin"
+    mock_file_name = f"{inspect.currentframe().f_code.co_name}.txt"
     test_file_setup_and_cleanup(mock_file_name)
 
     # aiohttp will follow redirects automatically, so we just test normal download

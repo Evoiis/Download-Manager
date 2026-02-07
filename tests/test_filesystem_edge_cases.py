@@ -1,8 +1,6 @@
-import asyncio
 import pytest
-import logging
 import os
-import stat
+import inspect
 
 from dmanager.core import DownloadManager, DownloadState
 from tests.helpers import wait_for_state, verify_file, wait_for_file_to_be_created
@@ -13,7 +11,7 @@ async def test_add_download_with_existing_file_different_size(async_thread_runne
     """Test when output file exists but has different size than expected"""
     chunks = [b"abc", b"def", b"ghi"]
     mock_url = "https://example.com/file.bin"
-    mock_file_name = "test_file.bin"
+    mock_file_name = f"{inspect.currentframe().f_code.co_name}.txt"
     test_file_setup_and_cleanup(mock_file_name)
 
     # Create existing file with different content
@@ -96,7 +94,7 @@ async def test_disk_full_during_download(async_thread_runner, create_mock_respon
     """
     chunks = [b"abc", b"def", b"ghi"]
     mock_url = "https://example.com/file.bin"
-    mock_file_name = "test_file.bin"
+    mock_file_name = f"{inspect.currentframe().f_code.co_name}.txt"
     test_file_setup_and_cleanup(mock_file_name)
 
     mock_response = create_mock_response_and_set_mock_session(
@@ -150,7 +148,7 @@ async def test_disk_full_during_download(async_thread_runner, create_mock_respon
 async def test_disk_full_during_preallocation(async_thread_runner, monkeypatch, test_file_setup_and_cleanup):
     """Test preallocation failure due to insufficient disk space"""
     mock_url = "https://example.com/file.bin"
-    mock_file_name = "test_file.bin"
+    mock_file_name = f"{inspect.currentframe().f_code.co_name}.txt"
     test_file_setup_and_cleanup(mock_file_name)
     
     from dmanager.constants import SEGMENT_SIZE
@@ -224,7 +222,7 @@ async def test_permission_denied_file_write(async_thread_runner, create_mock_res
     """Test handling of permission errors when writing files"""
     chunks = [b"abc"]
     mock_url = "https://example.com/file.bin"
-    mock_file_name = "test_file.bin"
+    mock_file_name = f"{inspect.currentframe().f_code.co_name}.txt"
     test_file_setup_and_cleanup(mock_file_name)
 
     mock_response = create_mock_response_and_set_mock_session(

@@ -1,6 +1,6 @@
 import asyncio
 import pytest
-import logging
+import inspect
 
 from dmanager.core import DownloadManager, DownloadState
 from tests.helpers import wait_for_state, verify_file, wait_for_file_to_be_created
@@ -71,7 +71,7 @@ async def test_etag_change_during_pause(monkeypatch, async_thread_runner, test_f
     """Test detection when ETag changes between pause and resume"""
     chunks = [b"abc", b"def", b"ghi"]
     mock_url = "https://example.com/file.bin"
-    mock_file_name = "test_file.bin"
+    mock_file_name = f"{inspect.currentframe().f_code.co_name}.txt"
     test_file_setup_and_cleanup(mock_file_name)
 
     mock_response = MockETagResponse(
@@ -131,7 +131,7 @@ async def test_etag_missing_then_appears(monkeypatch, async_thread_runner, test_
     """Test behavior when ETag is initially missing but appears on retry"""
     chunks = [b"abc", b"def", b"ghi"]
     mock_url = "https://example.com/file.bin"
-    mock_file_name = "test_file.bin"
+    mock_file_name = f"{inspect.currentframe().f_code.co_name}.txt"
     test_file_setup_and_cleanup(mock_file_name)
 
     mock_response = MockETagResponse(
@@ -188,7 +188,7 @@ async def test_file_size_change_detection(monkeypatch, async_thread_runner, test
     chunks_v2 = [b"1234", b"5678", b"9012", b"3456"]
     
     mock_url = "https://example.com/file.bin"
-    mock_file_name = "test_file.bin"
+    mock_file_name = f"{inspect.currentframe().f_code.co_name}.txt"
     test_file_setup_and_cleanup(mock_file_name)
 
     mock_response = MockETagResponse(
@@ -245,7 +245,7 @@ async def test_etag_with_quotes_stripping(monkeypatch, async_thread_runner, test
     """Test that ETag quotes are properly stripped"""
     chunks = [b"test"]
     mock_url = "https://example.com/file.bin"
-    mock_file_name = "test_file.bin"
+    mock_file_name = f"{inspect.currentframe().f_code.co_name}.txt"
     test_file_setup_and_cleanup(mock_file_name)
 
     mock_response = MockETagResponse(

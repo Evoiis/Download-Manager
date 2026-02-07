@@ -1,5 +1,6 @@
 import pytest
 import logging
+import inspect
 
 from dmanager.core import DownloadManager, DownloadState
 from tests.helpers import wait_for_state, verify_file, wait_for_file_to_be_created
@@ -9,7 +10,7 @@ from tests.helpers import wait_for_state, verify_file, wait_for_file_to_be_creat
 async def test_start_in_running_state(async_thread_runner, test_file_setup_and_cleanup, create_mock_response_and_set_mock_session):
     chunks = [b"abc", b"def", b"ghi"]
     mock_url = "https://example.com/file.bin"
-    mock_file_name = "test_file.bin"
+    mock_file_name = f"{inspect.currentframe().f_code.co_name}.txt"
     test_file_setup_and_cleanup(mock_file_name)
 
     mock_response = create_mock_response_and_set_mock_session(
@@ -50,7 +51,7 @@ async def test_start_in_completed_state(async_thread_runner, test_file_setup_and
     chunks = [b"abc", b"def", b"ghi"]
     mock_url = "https://example.com/file.bin"
 
-    mock_file_name = "test_file.bin"
+    mock_file_name = f"{inspect.currentframe().f_code.co_name}.txt"
     test_file_setup_and_cleanup(mock_file_name)
 
     mock_response = create_mock_response_and_set_mock_session(
@@ -86,7 +87,7 @@ async def test_start_in_completed_state(async_thread_runner, test_file_setup_and
 async def test_start_in_paused_state(async_thread_runner, test_file_setup_and_cleanup, create_mock_response_and_set_mock_session):
     chunks = [b"abc", b"def", b"ghi"]
     mock_url = "https://example.com/file.bin"
-    mock_file_name = "test_file.bin"
+    mock_file_name = f"{inspect.currentframe().f_code.co_name}.txt"
     test_file_setup_and_cleanup(mock_file_name)
 
     mock_response = create_mock_response_and_set_mock_session(
@@ -130,7 +131,7 @@ async def test_start_in_paused_state(async_thread_runner, test_file_setup_and_cl
 async def test_resume_in_running_state(async_thread_runner, test_file_setup_and_cleanup, create_mock_response_and_set_mock_session):
     chunks = [b"abc", b"def", b"ghi"]
     mock_url = "https://example.com/file.bin"
-    mock_file_name = "test_file.bin"
+    mock_file_name = f"{inspect.currentframe().f_code.co_name}.txt"
     test_file_setup_and_cleanup(mock_file_name)
 
     mock_response = create_mock_response_and_set_mock_session(
@@ -170,7 +171,7 @@ async def test_resume_completed_download(async_thread_runner, test_file_setup_an
     chunks = [b"abc", b"def", b"ghi"]
     mock_url = "https://example.com/file.bin"
 
-    mock_file_name = "test_file.bin"
+    mock_file_name = f"{inspect.currentframe().f_code.co_name}.txt"
     test_file_setup_and_cleanup(mock_file_name)
 
     mock_response = create_mock_response_and_set_mock_session(
@@ -210,7 +211,7 @@ async def test_pause_completed_download(async_thread_runner, test_file_setup_and
     chunks = [b"abc", b"def", b"ghi"]
     mock_url = "https://example.com/file.bin"
 
-    mock_file_name = "test_file.bin"
+    mock_file_name = f"{inspect.currentframe().f_code.co_name}.txt"
     test_file_setup_and_cleanup(mock_file_name)
 
     mock_response = create_mock_response_and_set_mock_session(
@@ -246,7 +247,7 @@ async def test_pause_completed_download(async_thread_runner, test_file_setup_and
 async def test_pause_in_paused_state(async_thread_runner, test_file_setup_and_cleanup, create_mock_response_and_set_mock_session):
     chunks = [b"abc", b"def", b"ghi"]
     mock_url = "https://example.com/file.bin"
-    mock_file_name = "test_file.bin"
+    mock_file_name = f"{inspect.currentframe().f_code.co_name}.txt"
     test_file_setup_and_cleanup(mock_file_name)
 
     mock_response = create_mock_response_and_set_mock_session(
@@ -290,7 +291,7 @@ async def test_pause_in_pending_state(async_thread_runner, test_file_setup_and_c
     chunks = [b"abc", b"def", b"ghi"]
     mock_url = "https://example.com/file.bin"
 
-    mock_file_name = "test_file.bin"
+    mock_file_name = f"{inspect.currentframe().f_code.co_name}.txt"
     test_file_setup_and_cleanup(mock_file_name)
 
     mock_response = create_mock_response_and_set_mock_session(
@@ -316,7 +317,7 @@ async def test_pause_in_pending_state(async_thread_runner, test_file_setup_and_c
 async def test_pause_in_error_state(async_thread_runner, create_mock_response_and_set_mock_session, test_file_setup_and_cleanup):
     chunks = ["invalid chunk because a bytes-like object is required :)"]
     mock_url = "https://example.com/file.bin"
-    mock_file_name = "test_file.bin"
+    mock_file_name = f"{inspect.currentframe().f_code.co_name}.txt"
     test_file_setup_and_cleanup(mock_file_name)
 
     mock_response = create_mock_response_and_set_mock_session(

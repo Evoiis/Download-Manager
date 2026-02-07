@@ -1,4 +1,5 @@
 import pytest
+import inspect
 
 from dmanager.core import DownloadManager, DownloadState
 from tests.helpers import wait_for_state, verify_file, wait_for_file_to_be_created, wait_for_multiple_states
@@ -20,7 +21,7 @@ async def test_parallel_download_single_byte_file(async_thread_runner, create_pa
     dm = DownloadManager(maximum_workers_per_task=n_workers, parallel_download_segment_size=segment_size)
 
     mock_url = "https://example.com/file.txt"
-    mock_file_name = "test_file.txt"
+    mock_file_name = f"{inspect.currentframe().f_code.co_name}.txt"
     test_file_setup_and_cleanup(mock_file_name)
 
     # Single byte file
@@ -66,7 +67,7 @@ async def test_parallel_download_exact_segment_boundary(async_thread_runner, cre
     dm = DownloadManager(maximum_workers_per_task=n_workers, parallel_download_segment_size=segment_size)
 
     mock_url = "https://example.com/file.txt"
-    mock_file_name = "test_file.txt"
+    mock_file_name = f"{inspect.currentframe().f_code.co_name}.txt"
     test_file_setup_and_cleanup(mock_file_name)
 
     # Exactly 2 segments
@@ -115,7 +116,7 @@ async def test_parallel_download_pause_during_different_worker_states(async_thre
     dm = DownloadManager(maximum_workers_per_task=n_workers, parallel_download_segment_size=segment_size)
 
     mock_url = "https://example.com/file.txt"
-    mock_file_name = "test_file.txt"
+    mock_file_name = f"{inspect.currentframe().f_code.co_name}.txt"
     test_file_setup_and_cleanup(mock_file_name)
 
     data = {
@@ -165,7 +166,7 @@ async def test_parallel_resume_with_partial_segments(async_thread_runner, create
     dm = DownloadManager(maximum_workers_per_task=n_workers, parallel_download_segment_size=segment_size)
 
     mock_url = "https://example.com/file.txt"
-    mock_file_name = "test_file.txt"
+    mock_file_name = f"{inspect.currentframe().f_code.co_name}.txt"
     test_file_setup_and_cleanup(mock_file_name)
 
     data = {
@@ -229,7 +230,7 @@ async def test_parallel_download_more_workers_than_segments(async_thread_runner,
     dm = DownloadManager(maximum_workers_per_task=n_workers, parallel_download_segment_size=segment_size)
 
     mock_url = "https://example.com/file.txt"
-    mock_file_name = "test_file.txt"
+    mock_file_name = f"{inspect.currentframe().f_code.co_name}.txt"
     test_file_setup_and_cleanup(mock_file_name)
 
     # Only 2 segments
@@ -278,7 +279,7 @@ async def test_parallel_iterator_exhaustion_race(async_thread_runner, create_par
     dm = DownloadManager(maximum_workers_per_task=n_workers, parallel_download_segment_size=segment_size)
 
     mock_url = "https://example.com/file.txt"
-    mock_file_name = "test_file.txt"
+    mock_file_name = f"{inspect.currentframe().f_code.co_name}.txt"
     test_file_setup_and_cleanup(mock_file_name)
 
     # Small file so iterator exhausts quickly
@@ -324,7 +325,7 @@ async def test_parallel_download_all_workers_complete_simultaneously(async_threa
     dm = DownloadManager(maximum_workers_per_task=n_workers, parallel_download_segment_size=segment_size)
 
     mock_url = "https://example.com/file.txt"
-    mock_file_name = "test_file.txt"
+    mock_file_name = f"{inspect.currentframe().f_code.co_name}.txt"
     test_file_setup_and_cleanup(mock_file_name)
 
     data = {

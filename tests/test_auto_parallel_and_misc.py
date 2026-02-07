@@ -1,6 +1,6 @@
 import asyncio
 import pytest
-import logging
+import inspect
 import os
 
 from dmanager.core import DownloadManager, DownloadState
@@ -16,7 +16,7 @@ from tests.helpers import wait_for_state, verify_file, wait_for_file_to_be_creat
 async def test_auto_parallel_exactly_one_gib(async_thread_runner, create_mock_response_and_set_mock_session, test_file_setup_and_cleanup):
     """Test boundary condition for automatic parallel decision at exactly 1 GiB"""
     mock_url = "https://example.com/file.bin"
-    mock_file_name = "test_file.bin"
+    mock_file_name = f"{inspect.currentframe().f_code.co_name}.txt"
     test_file_setup_and_cleanup(mock_file_name)
 
     mock_response = create_mock_response_and_set_mock_session(
@@ -50,7 +50,7 @@ async def test_auto_parallel_exactly_one_gib(async_thread_runner, create_mock_re
 async def test_auto_parallel_slightly_over_one_gib(async_thread_runner, create_mock_response_and_set_mock_session, test_file_setup_and_cleanup):
     """Test file just over 1 GiB threshold enables parallel"""
     mock_url = "https://example.com/file.bin"
-    mock_file_name = "test_file.bin"
+    mock_file_name = f"{inspect.currentframe().f_code.co_name}.txt"
     test_file_setup_and_cleanup(mock_file_name)
 
     mock_response = create_mock_response_and_set_mock_session(
@@ -83,7 +83,7 @@ async def test_auto_parallel_slightly_over_one_gib(async_thread_runner, create_m
 async def test_auto_parallel_slightly_under_one_gib(async_thread_runner, create_mock_response_and_set_mock_session, test_file_setup_and_cleanup):
     """Test file just under 1 GiB threshold doesn't use parallel"""
     mock_url = "https://example.com/file.bin"
-    mock_file_name = "test_file.bin"
+    mock_file_name = f"{inspect.currentframe().f_code.co_name}.txt"
     test_file_setup_and_cleanup(mock_file_name)
 
     mock_response = create_mock_response_and_set_mock_session(
@@ -116,7 +116,7 @@ async def test_auto_parallel_slightly_under_one_gib(async_thread_runner, create_
 async def test_force_parallel_on_small_file(async_thread_runner, create_parallel_mock_response_and_set_mock_session, test_file_setup_and_cleanup):
     """Test forcing parallel download for file < 1 GiB"""
     mock_url = "https://example.com/file.txt"
-    mock_file_name = "test_file.txt"
+    mock_file_name = f"{inspect.currentframe().f_code.co_name}.txt"
     test_file_setup_and_cleanup(mock_file_name)
 
     data = {
@@ -158,7 +158,7 @@ async def test_force_parallel_on_small_file(async_thread_runner, create_parallel
 async def test_force_parallel_off_large_file(async_thread_runner, create_mock_response_and_set_mock_session, test_file_setup_and_cleanup):
     """Test forcing single-connection download for file > 1 GiB"""
     mock_url = "https://example.com/file.bin"
-    mock_file_name = "test_file.bin"
+    mock_file_name = f"{inspect.currentframe().f_code.co_name}.txt"
     test_file_setup_and_cleanup(mock_file_name)
 
     mock_response = create_mock_response_and_set_mock_session(
@@ -278,7 +278,7 @@ async def test_active_time_accuracy(async_thread_runner, create_mock_response_an
     """Verify active_time accurately excludes pause time"""
     chunks = [b"abc", b"def", b"ghi"]
     mock_url = "https://example.com/file.bin"
-    mock_file_name = "test_file.bin"
+    mock_file_name = f"{inspect.currentframe().f_code.co_name}.txt"
     test_file_setup_and_cleanup(mock_file_name)
 
     mock_response = create_mock_response_and_set_mock_session(
@@ -321,7 +321,7 @@ async def test_download_speed_during_pause(async_thread_runner, create_mock_resp
     """Verify speed goes to 0 during pause"""
     chunks = [b"abc", b"def"]
     mock_url = "https://example.com/file.bin"
-    mock_file_name = "test_file.bin"
+    mock_file_name = f"{inspect.currentframe().f_code.co_name}.txt"
     test_file_setup_and_cleanup(mock_file_name)
 
     mock_response = create_mock_response_and_set_mock_session(
@@ -369,7 +369,7 @@ async def test_progress_percentage_accuracy(async_thread_runner, create_mock_res
     chunks = [b"a" * 250, b"b" * 250, b"c" * 250, b"d" * 250]
     
     mock_url = "https://example.com/file.bin"
-    mock_file_name = "test_file.bin"
+    mock_file_name = f"{inspect.currentframe().f_code.co_name}.txt"
     test_file_setup_and_cleanup(mock_file_name)
 
     mock_response = create_mock_response_and_set_mock_session(
@@ -418,7 +418,7 @@ async def test_shutdown_during_active_download(async_thread_runner, create_mock_
     """Test clean shutdown while downloads are running"""
     chunks = [b"a" * 1000]
     mock_url = "https://example.com/file.bin"
-    mock_file_name = "test_file.bin"
+    mock_file_name = f"{inspect.currentframe().f_code.co_name}.txt"
     test_file_setup_and_cleanup(mock_file_name)
 
     mock_response = create_mock_response_and_set_mock_session(
@@ -450,7 +450,7 @@ async def test_shutdown_during_active_download(async_thread_runner, create_mock_
 async def test_shutdown_during_preallocation(async_thread_runner, create_parallel_mock_response_and_set_mock_session, test_file_setup_and_cleanup):
     """Test clean shutdown during space preallocation"""
     mock_url = "https://example.com/file.bin"
-    mock_file_name = "test_file.bin"
+    mock_file_name = f"{inspect.currentframe().f_code.co_name}.txt"
     test_file_setup_and_cleanup(mock_file_name)
 
     # Large file to ensure preallocation takes time
@@ -485,7 +485,7 @@ async def test_shutdown_with_queued_events(async_thread_runner, create_mock_resp
     """Ensure events don't get lost during shutdown"""
     chunks = [b"a" * 100]
     mock_url = "https://example.com/file.bin"
-    mock_file_name = "test_file.bin"
+    mock_file_name = f"{inspect.currentframe().f_code.co_name}.txt"
     test_file_setup_and_cleanup(mock_file_name)
 
     mock_response = create_mock_response_and_set_mock_session(

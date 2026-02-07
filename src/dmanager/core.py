@@ -153,7 +153,9 @@ class DownloadManager:
         self._tasks: Dict[int, asyncio.Task[Any]] = {}
         self._task_pools: Dict[int, list] = {}
         self._preallocate_tasks: Dict[int, asyncio.Task[Any]] = {}
+        self._extra_tasks: list = []
         self._session: aiohttp.ClientSession = None
+        self._extra_tasks_lock = asyncio.Lock()
 
         self._running_event_update_rate_seconds = running_event_update_rate_seconds
         self._parallel_running_event_update_rate_seconds = parallel_running_event_update_rate_seconds
@@ -220,6 +222,21 @@ class DownloadManager:
             for res in results:
                 if isinstance(res, Exception) and not isinstance(res, asyncio.CancelledError):
                     logging.error(f"Task raised during shutdown: {res}", exc_info=True)
+            
+            self._tasks.clear()
+            self._task_pools.clear()
+            self._preallocate_tasks.clear()
+
+            async with self._extra_tasks_lock:
+                for t in self._extra_tasks:
+                    if not t.done():
+                        t.cancel()
+                results = await asyncio.gather(*self._extra_tasks, return_exceptions=True)
+
+                for res in results:
+                    if isinstance(res, Exception) and not isinstance(res, asyncio.CancelledError):
+                        logging.error(f"Task raised during shutdown: {res}", exc_info=True)
+            self._extra_tasks = []
 
         # Now close the session
         if self._session is not None and not self._session.closed:
@@ -230,6 +247,7 @@ class DownloadManager:
             except Exception as e:
                 logging.warning(f"Error closing aiohttp session during shutdown: {e}")
 
+        await asyncio.sleep(0.1)
         logging.info("DownloadManager shutdown complete")
     
     def get_downloads(self) -> Dict[int, DownloadMetadata]:
@@ -358,9 +376,9 @@ class DownloadManager:
             if download.use_parallel_download:
                 if download.parallel_metadata is None:
                     download.parallel_metadata = ParallelDownloadMetadata()
-                await self._start_parallel_connection_download(download) 
+                return await self._start_parallel_connection_download(download)
             else:
-                await self._start_single_connection_download(download)
+                return await self._start_single_connection_download(download)
         except Exception as err:
             tb = traceback.format_exc()
             logging.error(f"Traceback: {tb}")
@@ -390,7 +408,7 @@ class DownloadManager:
                 
                 if flag:
                     logging.info(f"{download.task_id}, Found workers still running for download. Not restarting download.")
-                    return
+                    return False
 
             if await self._check_if_complete_file_on_disk(download):
                 if download.parallel_metadata.leftover_segments.empty() and download.parallel_metadata.iterator_empty:
@@ -401,10 +419,10 @@ class DownloadManager:
                         state=download.state,
                         output_file=download.output_file
                     ))
-                    return
+                    return False
             
             if download.state == DownloadState.ALLOCATING_SPACE:
-                return
+                return False
 
             if not os.path.exists(download.output_file) or (os.path.exists(download.output_file) and os.path.getsize(download.output_file) != download.file_size_bytes):
                 self._preallocate_tasks[download.task_id] = asyncio.create_task(self._preallocate_file_space_on_disk(download))
@@ -414,6 +432,7 @@ class DownloadManager:
                     del self._preallocate_tasks[download.task_id]
 
             await self._create_task_pool(download)
+            return True
         except asyncio.CancelledError:
             logging.debug(f"{download.task_id=} paused during pre-allocating phase.")
             download.state = DownloadState.PAUSED
@@ -427,6 +446,7 @@ class DownloadManager:
             tb = traceback.format_exc()
             logging.error(f"Traceback: {tb}")
             await self._log_and_share_error_event(download, err)
+            return False
 
     async def _preallocate_file_space_on_disk(self, download: DownloadMetadata):
         """
@@ -473,14 +493,14 @@ class DownloadManager:
                 state=download.state,
                 output_file=download.output_file
             ))
-            return
+            return False
 
-        if download.task_id in self._tasks and not download.task_id.done():
+        if download.task_id in self._tasks and not self._tasks[download.task_id].done():
             logging.info(f"{download.task_id=}, not starting a new async task, found one still running for this download.")
-            return
+            return False
 
         self._tasks[download.task_id] = asyncio.create_task(self._download_file_coroutine(download))
-        return
+        return True
 
     async def pause_download(self, task_id: int) -> bool:
         """
@@ -882,8 +902,6 @@ class DownloadManager:
                             state=download.state,
                             output_file=download.output_file,
                         ))
-                    if download.task_id in self._task_pools:
-                        del self._task_pools[download.task_id]
                 return
             except Exception as err:
                 if next_write_byte != end_bytes:
@@ -918,13 +936,17 @@ class DownloadManager:
                     if self._stop_continue_on_n_errors is not None:
                         async with download.parallel_metadata.error_data_lock:
                             if download.error_count >= self._stop_continue_on_n_errors:
-                                asyncio.create_task(self.pause_download(download.task_id))
+                                async with self._extra_tasks_lock:
+                                    task = asyncio.create_task(self.pause_download(download.task_id))
+                                    self._extra_tasks.append(task)
                                 return
                     else:
-                        await asyncio.sleep(2)
+                        await asyncio.sleep(0.1)
                 else:
-                    asyncio.create_task(self.pause_download(download.task_id))
-                    return        
+                    async with self._extra_tasks_lock:
+                        task = asyncio.create_task(self.pause_download(download.task_id))
+                        self._extra_tasks.append(task)
+                    return
 
     async def _download_file_coroutine(self, download: DownloadMetadata) -> None:
         """
@@ -1007,7 +1029,6 @@ class DownloadManager:
                     download_size_bytes=download.file_size_bytes
                 ))
 
-                del self._tasks[download.task_id]
                 return
             except asyncio.CancelledError:
                 # download.state = DownloadState.PAUSED
@@ -1025,14 +1046,10 @@ class DownloadManager:
                 download.error_count += 1
                 if self._continue_on_error:
                     if self._stop_continue_on_n_errors is not None and download.error_count >= self._stop_continue_on_n_errors:
-                        if download.task_id in self._tasks:
-                            del self._tasks[download.task_id]
                         raise
                     else:
                         await asyncio.sleep(2)
                 else:
-                    if download.task_id in self._tasks:
-                        del self._tasks[download.task_id]
                     return
 
 

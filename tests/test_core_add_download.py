@@ -1,6 +1,7 @@
 import pytest
 import logging
 import os
+import inspect
 
 from dmanager.core import DownloadManager, DownloadState
 from tests.helpers import wait_for_state
@@ -9,7 +10,7 @@ from tests.helpers import wait_for_state
 async def test_add_download():
     dm = DownloadManager()
     mock_url = "https://example.com/file.bin"
-    mock_file_name = "test_file.bin"
+    mock_file_name = f"{inspect.currentframe().f_code.co_name}.txt"
 
     task_id = dm.add_download(mock_url, mock_file_name)
     
@@ -134,7 +135,7 @@ async def test_input_already_used_output_file():
     
     dm = DownloadManager()
     mock_url = "https://example.com/file.bin"
-    mock_file_name = "test_file.bin"
+    mock_file_name = f"{inspect.currentframe().f_code.co_name}.txt"
 
     task_id = dm.add_download(mock_url, mock_file_name)
     
@@ -144,7 +145,7 @@ async def test_input_already_used_output_file():
     assert download_metadata.output_file == mock_file_name
     
     mock_url_2 = "https://example.com/file.bin"
-    mock_file_name_2 = "test_file.bin"
+    mock_file_name_2 = mock_file_name
 
     task_id_2 = dm.add_download(mock_url_2, mock_file_name_2)
     
@@ -176,7 +177,7 @@ async def test_invalid_test_id(async_thread_runner):
 async def test_add_download_zero_workers_input():
     dm = DownloadManager()
     mock_url = "https://example.com/file.txt"
-    mock_file_name = "test_file.txt"
+    mock_file_name = f"{inspect.currentframe().f_code.co_name}.txt"
     
     task_id = dm.add_download(mock_url, mock_file_name, n_workers=0)
     

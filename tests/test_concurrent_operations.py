@@ -1,7 +1,7 @@
 import asyncio
 import pytest
 import logging
-import os
+import inspect
 
 from dmanager.core import DownloadManager, DownloadState
 from tests.helpers import wait_for_state, wait_for_file_to_be_created
@@ -12,7 +12,7 @@ async def test_delete_during_pause_operation(async_thread_runner, create_mock_re
     """Test race condition: delete while pause is in progress"""
     chunks = [b"a" * 1024 for _ in range(10)]
     mock_url = "https://example.com/file.bin"
-    mock_file_name = "test_file.bin"
+    mock_file_name = f"{inspect.currentframe().f_code.co_name}.txt"
     test_file_setup_and_cleanup(mock_file_name)
 
     mock_response = create_mock_response_and_set_mock_session(
@@ -59,7 +59,7 @@ async def test_pause_during_delete_operation(async_thread_runner, create_mock_re
     """Test race condition: pause while delete is in progress"""
     chunks = [b"a" * 1024 for _ in range(10)]
     mock_url = "https://example.com/file.bin"
-    mock_file_name = "test_file.bin"
+    mock_file_name = f"{inspect.currentframe().f_code.co_name}.txt"
     test_file_setup_and_cleanup(mock_file_name)
 
     mock_response = create_mock_response_and_set_mock_session(
@@ -178,7 +178,7 @@ async def test_concurrent_start_operations(async_thread_runner, create_mock_resp
     """Test multiple simultaneous start_download calls on same task"""
     chunks = [b"test"]
     mock_url = "https://example.com/file.bin"
-    mock_file_name = "test_file.bin"
+    mock_file_name = f"{inspect.currentframe().f_code.co_name}.txt"
     test_file_setup_and_cleanup(mock_file_name)
 
     mock_response = create_mock_response_and_set_mock_session(
@@ -218,7 +218,7 @@ async def test_concurrent_pause_operations(async_thread_runner, create_mock_resp
     """Test multiple simultaneous pause_download calls"""
     chunks = [b"a" * 1024]
     mock_url = "https://example.com/file.bin"
-    mock_file_name = "test_file.bin"
+    mock_file_name = f"{inspect.currentframe().f_code.co_name}.txt"
     test_file_setup_and_cleanup(mock_file_name)
 
     mock_response = create_mock_response_and_set_mock_session(
@@ -262,7 +262,7 @@ async def test_concurrent_delete_operations(async_thread_runner, create_mock_res
     """Test multiple simultaneous pause_download calls"""
     chunks = [b"a" * 1024]
     mock_url = "https://example.com/file.bin"
-    mock_file_name = "test_file.bin"
+    mock_file_name = f"{inspect.currentframe().f_code.co_name}.txt"
     test_file_setup_and_cleanup(mock_file_name)
 
     mock_response = create_mock_response_and_set_mock_session(
@@ -305,7 +305,7 @@ async def test_start_and_pause_race(async_thread_runner, create_mock_response_an
     """Test race between start and pause operations"""
     chunks = [b"a" * 1024]
     mock_url = "https://example.com/file.bin"
-    mock_file_name = "test_file.bin"
+    mock_file_name = f"{inspect.currentframe().f_code.co_name}.txt"
     test_file_setup_and_cleanup(mock_file_name)
 
     mock_response = create_mock_response_and_set_mock_session(
@@ -349,7 +349,7 @@ async def test_parallel_worker_concurrent_segment_access(async_thread_runner, cr
     dm = DownloadManager(maximum_workers_per_task=n_workers, parallel_download_segment_size=segment_size)
 
     mock_url = "https://example.com/file.txt"
-    mock_file_name = "test_file.txt"
+    mock_file_name = f"{inspect.currentframe().f_code.co_name}.txt"
     test_file_setup_and_cleanup(mock_file_name)
 
     # Only 4 segments
@@ -419,7 +419,7 @@ async def test_parallel_multiple_pauses_during_different_segments(async_thread_r
     dm = DownloadManager(maximum_workers_per_task=n_workers, parallel_download_segment_size=segment_size)
 
     mock_url = "https://example.com/file.txt"
-    mock_file_name = "test_file.txt"
+    mock_file_name = f"{inspect.currentframe().f_code.co_name}.txt"
     test_file_setup_and_cleanup(mock_file_name)
 
     data = {
@@ -494,7 +494,7 @@ async def test_parallel_multiple_pauses_during_different_segments(async_thread_r
 async def test_rapid_delete_and_read(async_thread_runner, create_mock_response_and_set_mock_session, test_file_setup_and_cleanup):
     """Test rapidly deleting and re-adding same download"""
     mock_url = "https://example.com/file.bin"
-    mock_file_name = "test_file.bin"
+    mock_file_name = f"{inspect.currentframe().f_code.co_name}.txt"
     test_file_setup_and_cleanup(mock_file_name)
 
     chunks = [b"test"]

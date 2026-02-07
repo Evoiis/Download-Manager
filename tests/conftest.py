@@ -3,6 +3,7 @@ import pytest
 import os
 import logging
 import copy
+import time
 
 from typing import Dict
 
@@ -217,6 +218,7 @@ def test_file_setup_and_cleanup(request):
         if test_file_name != "" and os.path.exists(test_file_name):
             logging.debug(f"Cleaning up {test_file_name=}")
             os.remove(test_file_name)
+            
     
     request.addfinalizer(cleanup)
     yield setup
@@ -238,6 +240,7 @@ def test_multiple_file_setup_and_cleanup(request):
             if os.path.exists(file):
                 logging.debug(f"Cleaning up {file=}")
                 os.remove(file)
+                
     
     request.addfinalizer(cleanup)
     yield setup

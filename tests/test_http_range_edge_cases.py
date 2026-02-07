@@ -1,6 +1,7 @@
 import asyncio
 import pytest
 import os
+import inspect
 
 from dmanager.core import DownloadManager, DownloadState
 from tests.helpers import wait_for_state, verify_file, wait_for_file_to_be_created
@@ -72,7 +73,7 @@ class MockRangeSession:
 async def test_server_returns_wrong_content_length_in_range(monkeypatch, async_thread_runner, test_file_setup_and_cleanup):
     """Test when server returns different amount of data than Content-Length indicates"""
     mock_url = "https://example.com/file.bin"
-    mock_file_name = "test_file.bin"
+    mock_file_name = f"{inspect.currentframe().f_code.co_name}.txt"
     test_file_setup_and_cleanup(mock_file_name)
 
     # Server says 9 bytes but we'll send more
@@ -112,7 +113,7 @@ async def test_resume_with_corrupted_partial_file(async_thread_runner, create_mo
     """Test when partial file exists but is larger than expected"""
     chunks = [b"abc", b"def", b"ghi"]
     mock_url = "https://example.com/file.bin"
-    mock_file_name = "test_file.bin"
+    mock_file_name = f"{inspect.currentframe().f_code.co_name}.txt"
     test_file_setup_and_cleanup(mock_file_name)
 
     # Create a partial file that's TOO LARGE
@@ -153,7 +154,7 @@ async def test_server_no_accept_ranges_header(async_thread_runner, create_mock_r
     """Test server that doesn't support range requests"""
     chunks = [b"abc", b"def", b"ghi"]
     mock_url = "https://example.com/file.bin"
-    mock_file_name = "test_file.bin"
+    mock_file_name = f"{inspect.currentframe().f_code.co_name}.txt"
     test_file_setup_and_cleanup(mock_file_name)
 
     # No Accept-Ranges header
@@ -193,7 +194,7 @@ async def test_server_accept_ranges_none(async_thread_runner, create_mock_respon
     """Test server that explicitly doesn't support ranges (Accept-Ranges: none)"""
     chunks = [b"abc", b"def", b"ghi"]
     mock_url = "https://example.com/file.bin"
-    mock_file_name = "test_file.bin"
+    mock_file_name = f"{inspect.currentframe().f_code.co_name}.txt"
     test_file_setup_and_cleanup(mock_file_name)
 
     mock_response = create_mock_response_and_set_mock_session(
@@ -230,7 +231,7 @@ async def test_parallel_range_header_format(monkeypatch, async_thread_runner, te
     """Test that parallel workers send correctly formatted Range headers"""
     
     mock_url = "https://example.com/file.txt"
-    mock_file_name = "test_file.txt"
+    mock_file_name = f"{inspect.currentframe().f_code.co_name}.txt"
     test_file_setup_and_cleanup(mock_file_name)
 
     class MockParallelRangeResponse:
@@ -306,7 +307,7 @@ async def test_parallel_range_header_format(monkeypatch, async_thread_runner, te
 async def test_304_not_modified_response(monkeypatch, async_thread_runner, test_file_setup_and_cleanup):
     """Test handling of 304 Not Modified response"""
     mock_url = "https://example.com/file.bin"
-    mock_file_name = "test_file.bin"
+    mock_file_name = f"{inspect.currentframe().f_code.co_name}.txt"
     test_file_setup_and_cleanup(mock_file_name)
 
     mock_response = MockRangeResponse(
@@ -336,7 +337,7 @@ async def test_304_not_modified_response(monkeypatch, async_thread_runner, test_
 async def test_416_range_not_satisfiable(monkeypatch, async_thread_runner, test_file_setup_and_cleanup):
     """Test handling of 416 Range Not Satisfiable response"""
     mock_url = "https://example.com/file.bin"
-    mock_file_name = "test_file.bin"
+    mock_file_name = f"{inspect.currentframe().f_code.co_name}.txt"
     test_file_setup_and_cleanup(mock_file_name)
 
     # Create file that's already complete

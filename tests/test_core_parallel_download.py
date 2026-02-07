@@ -2,6 +2,7 @@ import asyncio
 import os
 import pytest
 import logging
+import inspect
 
 from dmanager.core import DownloadManager, DownloadState, DownloadMetadata
 from tests.helpers import wait_for_state, verify_file, wait_for_file_to_be_created, wait_for_multiple_states
@@ -19,7 +20,7 @@ async def test_n_worker_parallel_download_coroutine(async_thread_runner, create_
     dm = DownloadManager(maximum_workers_per_task=n_workers, parallel_download_segment_size=segment_size)
 
     mock_url = "https://example.com/file.txt"
-    mock_file_name = "test_file.txt"
+    mock_file_name = f"{inspect.currentframe().f_code.co_name}.txt"
     test_file_setup_and_cleanup(mock_file_name)
 
 
@@ -72,7 +73,7 @@ async def test_parallel_download_pause(async_thread_runner, create_parallel_mock
     dm = DownloadManager(maximum_workers_per_task=n_workers, parallel_download_segment_size=segment_size)
 
     mock_url = "https://example.com/file.txt"
-    mock_file_name = "test_file.txt"
+    mock_file_name = f"{inspect.currentframe().f_code.co_name}.txt"
     test_file_setup_and_cleanup(mock_file_name)
 
     
@@ -120,7 +121,7 @@ async def test_parallel_download_resume(async_thread_runner, create_parallel_moc
     dm = DownloadManager(maximum_workers_per_task=n_workers, parallel_download_segment_size=segment_size)
 
     mock_url = "https://example.com/file.txt"
-    mock_file_name = "test_file.txt"
+    mock_file_name = f"{inspect.currentframe().f_code.co_name}.txt"
     test_file_setup_and_cleanup(mock_file_name)
 
     
@@ -183,7 +184,7 @@ async def test_parallel_download_delete_running(async_thread_runner, create_para
     dm = DownloadManager(maximum_workers_per_task=n_workers, parallel_download_segment_size=segment_size)
 
     mock_url = "https://example.com/file.txt"
-    mock_file_name = "test_file.txt"
+    mock_file_name = f"{inspect.currentframe().f_code.co_name}.txt"
     test_file_setup_and_cleanup(mock_file_name)
 
     
@@ -233,7 +234,7 @@ async def test_parallel_download_delete_completed(async_thread_runner, create_pa
     dm = DownloadManager(maximum_workers_per_task=n_workers, parallel_download_segment_size=segment_size)
 
     mock_url = "https://example.com/file.txt"
-    mock_file_name = "test_file.txt"
+    mock_file_name = f"{inspect.currentframe().f_code.co_name}.txt"
     test_file_setup_and_cleanup(mock_file_name)
 
     data = {
@@ -294,7 +295,7 @@ async def test_multiple_simultaneous_parallel_download(async_thread_runner, crea
     dm = DownloadManager(maximum_workers_per_task=n_workers, parallel_download_segment_size=segment_size)
 
     mock_url = "https://example.com/file.txt"
-    mock_file_name = "test_file.txt"
+    mock_file_name = f"{inspect.currentframe().f_code.co_name}.txt"
 
     mock_url_2 = "https://example.com/file_2.txt"
     mock_file_name_2 = "test_file_2.txt"
@@ -366,7 +367,7 @@ async def test_core_file_preallocation(test_file_setup_and_cleanup):
     segment_size = 16 * 1024
     dm = DownloadManager(maximum_workers_per_task=n_workers, parallel_download_segment_size=segment_size)
 
-    mock_file_name = "test_file.bin"
+    mock_file_name = f"{inspect.currentframe().f_code.co_name}.txt"
     mock_file_total_size = 9000
     test_file_setup_and_cleanup(mock_file_name)
     
@@ -391,7 +392,7 @@ async def test_parallel_pause_during_preallocate(async_thread_runner, create_par
     dm = DownloadManager(maximum_workers_per_task=n_workers, parallel_download_segment_size=segment_size)
 
     mock_url = "https://example.com/file.txt"
-    mock_file_name = "test_file.txt"
+    mock_file_name = f"{inspect.currentframe().f_code.co_name}.txt"
     test_file_setup_and_cleanup(mock_file_name)
     mock_file_total_size = 6442450944 # 6 GIBIBYTES
     
