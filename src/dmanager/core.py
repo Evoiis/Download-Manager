@@ -234,10 +234,7 @@ class DownloadManager:
                     for task in self._extra_tasks:
                         if not task.done():
                             task.cancel()
-                        try:
-                            await task
-                        except asyncio.CancelledError:
-                            pass
+
                     results = await asyncio.gather(*self._extra_tasks, return_exceptions=True)
 
                     for res in results:
