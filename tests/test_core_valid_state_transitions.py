@@ -163,7 +163,7 @@ async def test_resume_download(async_thread_runner, create_mock_response_and_set
 
 
 @pytest.mark.asyncio
-async def test_delete_from_pending_state():
+async def test_delete_from_pending_state(async_thread_runner):
     mock_url = "https://example.com/file.bin"
     mock_file_name = f"{inspect.currentframe().f_code.co_name}.txt"
     dm = DownloadManager()
@@ -171,7 +171,8 @@ async def test_delete_from_pending_state():
 
     assert task_id in dm.get_downloads()
 
-    await dm.delete_download(task_id, remove_file=False)
+    future = async_thread_runner.submit(dm.delete_download(task_id, remove_file=False))
+    future.result(timeout=15)
 
     assert task_id not in dm.get_downloads()    
 
@@ -242,7 +243,7 @@ async def test_delete_from_paused_state(async_thread_runner, test_file_setup_and
     await wait_for_state(dm, task_id, DownloadState.PAUSED)
 
     logging.debug("Download is paused, now run delete_download")
-    await dm.delete_download(task_id, remove_file=False)
+    async_thread_runner.submit(dm.delete_download(task_id, remove_file=False))
 
     await wait_for_state(dm, task_id, DownloadState.DELETED)
 
@@ -271,7 +272,7 @@ async def test_delete_from_completed_state(async_thread_runner, test_file_setup_
 
     dm = DownloadManager()
     task_id = dm.add_download(mock_url, mock_file_name)
-    download_future = async_thread_runner.submit(dm.start_download(task_id))
+    async_thread_runner.submit(dm.start_download(task_id))
 
     await mock_response.insert_chunk(chunks[0])
     mock_response.end_response()
@@ -280,10 +281,9 @@ async def test_delete_from_completed_state(async_thread_runner, test_file_setup_
     wait_for_file_to_be_created(mock_file_name)
 
     await wait_for_state(dm, task_id, DownloadState.COMPLETED)
-    download_future.result(timeout=15)
 
     logging.debug("Download is completed, now run delete_download")
-    await dm.delete_download(task_id, remove_file=False)
+    future = async_thread_runner.submit(dm.delete_download(task_id, remove_file=False))
 
     await wait_for_state(dm, task_id, DownloadState.DELETED)
 

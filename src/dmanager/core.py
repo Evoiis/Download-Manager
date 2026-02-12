@@ -218,10 +218,6 @@ class DownloadManager:
             for task in all_tasks:
                 if not task.done():
                     task.cancel()
-                    try: 
-                        await task
-                    except asyncio.CancelledError:
-                        pass
 
             results = await asyncio.gather(*all_tasks, return_exceptions=True)
 
@@ -234,21 +230,18 @@ class DownloadManager:
             self._preallocate_tasks.clear()
 
             async with self._extra_tasks_lock:
-                for task in self._extra_tasks:
-                    if not task.done():
-                        task.cancel()
-                    try: 
-                        await task
-                    except asyncio.CancelledError:
-                        pass
-                results = await asyncio.gather(*self._extra_tasks, return_exceptions=True)
+                if self._extra_tasks:
+                    for task in self._extra_tasks:
+                        if not task.done():
+                            task.cancel()
 
-                for res in results:
-                    if isinstance(res, Exception) and not isinstance(res, asyncio.CancelledError):
-                        logging.error(f"Task raised during shutdown: {res}", exc_info=True)
+                    results = await asyncio.gather(*self._extra_tasks, return_exceptions=True)
+
+                    for res in results:
+                        if isinstance(res, Exception) and not isinstance(res, asyncio.CancelledError):
+                            logging.error(f"Task raised during shutdown: {res}", exc_info=True)
             self._extra_tasks = []
 
-        # Now close the session
         if self._session is not None and not self._session.closed:
             try:
                 await self._session.close()
@@ -532,10 +525,10 @@ class DownloadManager:
                     task = self._preallocate_tasks[task_id]
                     if not task.done():
                         task.cancel()
-                        try: 
-                            await task
-                        except asyncio.CancelledError:
-                            pass
+                    try: 
+                        await task
+                    except asyncio.CancelledError:
+                        pass
                     if task_id in self._preallocate_tasks:
                         del self._preallocate_tasks[task_id]
                     return True
@@ -550,19 +543,21 @@ class DownloadManager:
                 if task_id not in self._task_pools:
                     return False
                 task_pool = self._task_pools[task_id]
+                logging.debug(f"[pause_download] stopping {len(task_pool)} workers from task {task_id=}")
                 for task in task_pool:
                     if not task.done():
                         task.cancel()
-                        try:
-                            await task
-                        except asyncio.CancelledError:
-                            pass
+                    try:
+                        await task
+                    except asyncio.CancelledError:
+                        pass
                 if download.task_id in self._task_pools:
                     del self._task_pools[download.task_id]
             else:
                 if task_id not in self._tasks:
                     raise Exception("Error: [pause_download], task_id not in DownloadManager task list")
                 task = self._tasks[task_id]
+                logging.debug(f"[pause_download] stopping worker from task {task_id=}")
                 if not task.done():
                     task.cancel()
                     try:
@@ -612,15 +607,35 @@ class DownloadManager:
                 return False
 
             download = self._downloads[task_id]
-            if self._downloads[task_id].state == DownloadState.RUNNING:
+            if self._downloads[task_id].state in (DownloadState.RUNNING, DownloadState.ERROR):
                 if not await self.pause_download(task_id):
-                    logging.warning("[delete_download]: pause_download returned false")
+                    raise Exception(f"[delete_download] {task_id=}, Pause Download failed when called from Delete Download")
             
             if task_id in self._tasks:
-                del self._tasks[task_id]
+                task = self._tasks[task_id]
+                logging.debug(f"[delete_download] stopping worker from task {task_id=}")
+                if not task.done():
+                    task.cancel()
+                try:
+                    await task
+                except asyncio.CancelledError:
+                    pass
+                if task_id in self._tasks:
+                    del self._tasks[task_id]
 
             if task_id in self._task_pools:
-                del self._task_pools[task_id]
+                task_pool = self._task_pools[task_id]
+                logging.debug(f"[delete_download] stopping {len(task_pool)} workers from task {task_id=}")
+                for task in task_pool:
+                    if not task.done():
+                        task.cancel()
+                try:
+                    await task
+                except asyncio.CancelledError:
+                    pass
+                if task_id in self._task_pools:
+                    logging.debug(f"Deleting {task_id} from {self._task_pools=}")
+                    del self._task_pools[task_id]
             
             if remove_file and os.path.exists(self._downloads[task_id].output_file):
                 try:
@@ -826,18 +841,23 @@ class DownloadManager:
                             await f.seek(next_write_byte)
                             await f.write(chunk)
 
+                            logging.debug(f"Task {download.task_id}, Worker {worker_id} finished write.")
+
                             next_write_byte += len(chunk)
 
                             async with download.parallel_metadata.worker_state_lock:
                                 download.downloaded_bytes += len(chunk)
                             
+                            logging.debug(f"Task {download.task_id}, Worker {worker_id}. Updated download metadata: {download=}")
                             speed_calc.add_bytes(len(chunk))
 
                             now = time.monotonic()
                             active_time += timedelta(seconds=now - last_active_time_update)
                             last_active_time_update = now
 
-                            if (time.monotonic() - last_running_update) > self._parallel_running_event_update_rate_seconds:
+                            logging.debug(f"Task {download.task_id}, Worker {worker_id}. Before update calc. {time.monotonic() - last_running_update=}, {self._parallel_running_event_update_rate_seconds=}")
+                            if (time.monotonic() - last_running_update) >= self._parallel_running_event_update_rate_seconds:
+                                logging.debug(f"Task {download.task_id}, Worker {worker_id}. Going to send running event.")
                                 last_running_update = time.monotonic()
 
                                 async with download.parallel_metadata.download_state_lock:
@@ -846,7 +866,7 @@ class DownloadManager:
                                     download.parallel_metadata.worker_states[worker_id] = DownloadState.RUNNING
 
                                 download_speed = speed_calc.get_speed()
-
+                                
                                 self._add_event_to_queue(DownloadEvent(
                                     task_id=download.task_id,
                                     state=DownloadState.RUNNING,
@@ -857,6 +877,7 @@ class DownloadManager:
                                     download_size_bytes=download.file_size_bytes,
                                     worker_id=worker_id
                                 ))            
+                                logging.debug(f"Task {download.task_id}, Worker {worker_id}. Sent running event.")
             except asyncio.CancelledError:
                 if next_write_byte != end_bytes:
                     download.parallel_metadata.leftover_segments.put_nowait((next_write_byte, end_bytes))
@@ -864,10 +885,6 @@ class DownloadManager:
                 # flag = True
                 async with download.parallel_metadata.worker_state_lock:
                     download.parallel_metadata.worker_states[worker_id] = DownloadState.PAUSED
-                #     for worker in download.parallel_metadata.worker_states:
-                #         if download.parallel_metadata.worker_states[worker] not in [DownloadState.PAUSED, DownloadState.COMPLETED]:
-                #             flag = False
-                #             break
 
                 self._add_event_to_queue(DownloadEvent(
                     task_id=download.task_id,
@@ -877,14 +894,6 @@ class DownloadManager:
                     active_time=active_time
                 ))
                 
-                # if flag:
-                #     async with download.parallel_metadata.download_state_lock:
-                #         download.state = DownloadState.PAUSED
-                #         self._add_event_to_queue(DownloadEvent(
-                #             task_id=download.task_id,
-                #             state=download.state,
-                #             output_file=download.output_file,
-                #         ))
                 raise
             except StopIteration:
                 logging.debug(f"Download {download.task_id}, Worker {worker_id}, found no tasks, worker complete.")
@@ -946,7 +955,6 @@ class DownloadManager:
                         active_time=active_time
                     ))
                 
-                # Short wait before going back into the loop
                 if self._continue_on_error:
                     if self._stop_continue_on_n_errors is not None:
                         async with download.parallel_metadata.error_data_lock:

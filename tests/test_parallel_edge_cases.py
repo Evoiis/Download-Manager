@@ -113,7 +113,7 @@ async def test_parallel_download_pause_during_different_worker_states(async_thre
     """Pause when workers are in mixed states (some running, some pending)"""
     n_workers = 4
     segment_size = 1024
-    dm = DownloadManager(maximum_workers_per_task=n_workers, parallel_download_segment_size=segment_size)
+    dm = DownloadManager(maximum_workers_per_task=n_workers, parallel_download_segment_size=segment_size, parallel_running_event_update_rate_seconds=0)
 
     mock_url = "https://example.com/file.txt"
     mock_file_name = f"{inspect.currentframe().f_code.co_name}.txt"
