@@ -7,14 +7,7 @@ from typing import Dict, Tuple
 
 from dmanager.core import DownloadState
 
-
-IN_GITHUB_CI_ENV = os.getenv("GITHUB_ACTIONS") == "true"
-
-if IN_GITHUB_CI_ENV:
-    # Use a longer timeout for CI
-    DEFAULT_TIMEOUT = 60
-else:
-    DEFAULT_TIMEOUT = 30
+DEFAULT_TIMEOUT = 30
 
 async def wait_for_state(dm, task_id, expected_state, timeout_sec=DEFAULT_TIMEOUT):
     """

@@ -148,7 +148,7 @@ async def test_parallel_worker_continue_on_failure(test_file_setup_and_cleanup, 
         data
     )
 
-    mock_response.set_range_end_n_send(str(segment_size - 1), segment_size)
+    mock_response.set_range_end_n_send(str(segment_size - 1), segment_size//2)
 
     task_id = dm.add_download(mock_url, mock_file_name)
     async_thread_runner.submit(dm.start_download(task_id, use_parallel_download=True))

@@ -107,6 +107,7 @@ class MockParallelResponse():
             if self.send_n_letters[range_end] > 0:
                 if len(self.data[range_end]) > 0:
                     slice_size = min(1024, self.send_n_letters[range_end])
+                    logging.debug(f"[MockParallelResponse] yielding {slice_size} bytes")
                     yield bytes(self.data[range_end][:slice_size])
                     self.data[range_end] = self.data[range_end][slice_size:]
                     self.send_n_letters[range_end] -= slice_size
