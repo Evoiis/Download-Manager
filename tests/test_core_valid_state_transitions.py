@@ -163,7 +163,7 @@ async def test_resume_download(async_thread_runner, create_mock_response_and_set
 
 
 @pytest.mark.asyncio
-async def test_delete_from_pending_state():
+async def test_delete_from_pending_state(async_thread_runner):
     mock_url = "https://example.com/file.bin"
     mock_file_name = f"{inspect.currentframe().f_code.co_name}.txt"
     dm = DownloadManager()
@@ -171,7 +171,8 @@ async def test_delete_from_pending_state():
 
     assert task_id in dm.get_downloads()
 
-    async_thread_runner.submit(dm.delete_download(task_id, remove_file=False))
+    future = async_thread_runner.submit(dm.delete_download(task_id, remove_file=False))
+    future.result(timeout=15)
 
     assert task_id not in dm.get_downloads()    
 
@@ -285,7 +286,6 @@ async def test_delete_from_completed_state(async_thread_runner, test_file_setup_
     future = async_thread_runner.submit(dm.delete_download(task_id, remove_file=False))
 
     await wait_for_state(dm, task_id, DownloadState.DELETED)
-    future.result(timeout=15)
 
     assert task_id not in dm.get_downloads()
     assert task_id not in dm._tasks
