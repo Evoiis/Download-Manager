@@ -416,7 +416,7 @@ async def test_parallel_multiple_pauses_during_different_segments(async_thread_r
     """Test pausing and resuming at different points in parallel download"""
     n_workers = 4
     segment_size = 1024
-    dm = DownloadManager(maximum_workers_per_task=n_workers, parallel_download_segment_size=segment_size)
+    dm = DownloadManager(maximum_workers_per_task=n_workers, parallel_download_segment_size=segment_size, parallel_running_event_update_rate_seconds=0)
 
     mock_url = "https://example.com/file.txt"
     mock_file_name = f"{inspect.currentframe().f_code.co_name}.txt"

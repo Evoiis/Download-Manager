@@ -63,7 +63,7 @@ async def test_parallel_download_fake_timeout(test_file_setup_and_cleanup, async
     
     n_workers = 4
     segment_size = 1024
-    dm = download_manager_fixture(async_thread_runner, maximum_workers_per_task=n_workers, parallel_download_segment_size=segment_size, continue_on_error=False)
+    dm = download_manager_fixture(async_thread_runner, maximum_workers_per_task=n_workers, parallel_download_segment_size=segment_size, continue_on_error=False, parallel_running_event_update_rate_seconds=0)
 
     mock_url = "https://example.com/file.txt"
     mock_file_name = f"{inspect.currentframe().f_code.co_name}.txt"
@@ -122,7 +122,8 @@ async def test_parallel_worker_continue_on_failure(test_file_setup_and_cleanup, 
         maximum_workers_per_task=n_workers, 
         parallel_download_segment_size=segment_size, 
         continue_on_error=True,
-        stop_continue_on_n_errors=None
+        stop_continue_on_n_errors=None,
+        parallel_running_event_update_rate_seconds=0
     )
 
     mock_url = "https://example.com/file.txt"
@@ -365,7 +366,8 @@ async def test_parallel_worker_start_after_failure(test_file_setup_and_cleanup, 
         maximum_workers_per_task=n_workers, 
         parallel_download_segment_size=segment_size,
         continue_on_error=continue_on_error,
-        stop_continue_on_n_errors=None
+        stop_continue_on_n_errors=None,
+        parallel_running_event_update_rate_seconds=0
     )
     
     mock_url = "https://example.com/file.txt"
