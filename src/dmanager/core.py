@@ -616,11 +616,11 @@ class DownloadManager:
                 task = self._tasks[task_id]
                 if not task.done():
                     task.cancel()
-                    try:
-                        await task
-                    except asyncio.CancelledError:
-                        pass
-                if task_id in self._task_pools:
+                try:
+                    await task
+                except asyncio.CancelledError:
+                    pass
+                if task_id in self._tasks:
                     del self._tasks[task_id]
 
             if task_id in self._task_pools:
@@ -628,12 +628,13 @@ class DownloadManager:
                 for task in task_pool:
                     if not task.done():
                         task.cancel()
-                    try:
-                        await task
-                    except asyncio.CancelledError:
-                        pass
+                try:
+                    await task
+                except asyncio.CancelledError:
+                    pass
                 if task_id in self._task_pools:
-                    del self._task_pools[download.task_id]
+                    logging.debug(f"Deleting {task_id} from {self._task_pools=}")
+                    del self._task_pools[task_id]
             
             if remove_file and os.path.exists(self._downloads[task_id].output_file):
                 try:
