@@ -218,10 +218,6 @@ class DownloadManager:
             for task in all_tasks:
                 if not task.done():
                     task.cancel()
-                    try: 
-                        await task
-                    except asyncio.CancelledError:
-                        pass
 
             results = await asyncio.gather(*all_tasks, return_exceptions=True)
 
@@ -234,21 +230,21 @@ class DownloadManager:
             self._preallocate_tasks.clear()
 
             async with self._extra_tasks_lock:
-                for task in self._extra_tasks:
-                    if not task.done():
-                        task.cancel()
-                    try: 
-                        await task
-                    except asyncio.CancelledError:
-                        pass
-                results = await asyncio.gather(*self._extra_tasks, return_exceptions=True)
+                if self._extra_tasks:
+                    for task in self._extra_tasks:
+                        if not task.done():
+                            task.cancel()
+                        try:
+                            await task
+                        except asyncio.CancelledError:
+                            pass
+                    results = await asyncio.gather(*self._extra_tasks, return_exceptions=True)
 
-                for res in results:
-                    if isinstance(res, Exception) and not isinstance(res, asyncio.CancelledError):
-                        logging.error(f"Task raised during shutdown: {res}", exc_info=True)
+                    for res in results:
+                        if isinstance(res, Exception) and not isinstance(res, asyncio.CancelledError):
+                            logging.error(f"Task raised during shutdown: {res}", exc_info=True)
             self._extra_tasks = []
 
-        # Now close the session
         if self._session is not None and not self._session.closed:
             try:
                 await self._session.close()
@@ -532,10 +528,10 @@ class DownloadManager:
                     task = self._preallocate_tasks[task_id]
                     if not task.done():
                         task.cancel()
-                        try: 
-                            await task
-                        except asyncio.CancelledError:
-                            pass
+                    try: 
+                        await task
+                    except asyncio.CancelledError:
+                        pass
                     if task_id in self._preallocate_tasks:
                         del self._preallocate_tasks[task_id]
                     return True
@@ -553,10 +549,10 @@ class DownloadManager:
                 for task in task_pool:
                     if not task.done():
                         task.cancel()
-                        try:
-                            await task
-                        except asyncio.CancelledError:
-                            pass
+                    try:
+                        await task
+                    except asyncio.CancelledError:
+                        pass
                 if download.task_id in self._task_pools:
                     del self._task_pools[download.task_id]
             else:
@@ -612,15 +608,32 @@ class DownloadManager:
                 return False
 
             download = self._downloads[task_id]
-            if self._downloads[task_id].state == DownloadState.RUNNING:
+            if self._downloads[task_id].state in (DownloadState.RUNNING, DownloadState.ERROR):
                 if not await self.pause_download(task_id):
-                    logging.warning("[delete_download]: pause_download returned false")
+                    raise Exception("Pause Download failed when called from Delete Download")
             
             if task_id in self._tasks:
-                del self._tasks[task_id]
+                task = self._tasks[task_id]
+                if not task.done():
+                    task.cancel()
+                    try:
+                        await task
+                    except asyncio.CancelledError:
+                        pass
+                if task_id in self._task_pools:
+                    del self._tasks[task_id]
 
             if task_id in self._task_pools:
-                del self._task_pools[task_id]
+                task_pool = self._task_pools[task_id]
+                for task in task_pool:
+                    if not task.done():
+                        task.cancel()
+                    try:
+                        await task
+                    except asyncio.CancelledError:
+                        pass
+                if task_id in self._task_pools:
+                    del self._task_pools[download.task_id]
             
             if remove_file and os.path.exists(self._downloads[task_id].output_file):
                 try:
@@ -864,10 +877,6 @@ class DownloadManager:
                 # flag = True
                 async with download.parallel_metadata.worker_state_lock:
                     download.parallel_metadata.worker_states[worker_id] = DownloadState.PAUSED
-                #     for worker in download.parallel_metadata.worker_states:
-                #         if download.parallel_metadata.worker_states[worker] not in [DownloadState.PAUSED, DownloadState.COMPLETED]:
-                #             flag = False
-                #             break
 
                 self._add_event_to_queue(DownloadEvent(
                     task_id=download.task_id,
@@ -877,14 +886,6 @@ class DownloadManager:
                     active_time=active_time
                 ))
                 
-                # if flag:
-                #     async with download.parallel_metadata.download_state_lock:
-                #         download.state = DownloadState.PAUSED
-                #         self._add_event_to_queue(DownloadEvent(
-                #             task_id=download.task_id,
-                #             state=download.state,
-                #             output_file=download.output_file,
-                #         ))
                 raise
             except StopIteration:
                 logging.debug(f"Download {download.task_id}, Worker {worker_id}, found no tasks, worker complete.")
