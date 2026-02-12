@@ -543,6 +543,7 @@ class DownloadManager:
                 if task_id not in self._task_pools:
                     return False
                 task_pool = self._task_pools[task_id]
+                logging.debug(f"[pause_download] stopping {len(task_pool)} workers from task {task_id=}")
                 for task in task_pool:
                     if not task.done():
                         task.cancel()
@@ -556,6 +557,7 @@ class DownloadManager:
                 if task_id not in self._tasks:
                     raise Exception("Error: [pause_download], task_id not in DownloadManager task list")
                 task = self._tasks[task_id]
+                logging.debug(f"[pause_download] stopping worker from task {task_id=}")
                 if not task.done():
                     task.cancel()
                     try:
