@@ -609,10 +609,11 @@ class DownloadManager:
             download = self._downloads[task_id]
             if self._downloads[task_id].state in (DownloadState.RUNNING, DownloadState.ERROR):
                 if not await self.pause_download(task_id):
-                    raise Exception("Pause Download failed when called from Delete Download")
+                    raise Exception(f"[delete_download] {task_id=}, Pause Download failed when called from Delete Download")
             
             if task_id in self._tasks:
                 task = self._tasks[task_id]
+                logging.debug(f"[delete_download] stopping worker from task {task_id=}")
                 if not task.done():
                     task.cancel()
                 try:
@@ -624,6 +625,7 @@ class DownloadManager:
 
             if task_id in self._task_pools:
                 task_pool = self._task_pools[task_id]
+                logging.debug(f"[delete_download] stopping {len(task_pool)} workers from task {task_id=}")
                 for task in task_pool:
                     if not task.done():
                         task.cancel()

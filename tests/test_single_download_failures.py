@@ -148,7 +148,7 @@ async def test_single_download_continue_on_error(async_thread_runner, test_file_
     
     await wait_for_state(dm, task_id, DownloadState.RUNNING)
 
-    mock_response.set_exception(Exception("Mock Exception: Fake bad news."))
+    mock_response.set_exception(Exception("Mock Exception"))
 
     await wait_for_state(dm, task_id, DownloadState.ERROR)
 
@@ -190,7 +190,7 @@ async def test_single_download_do_not_continue_on_error(async_thread_runner, tes
     
     await wait_for_state(dm, task_id, DownloadState.RUNNING)
 
-    exception = Exception("Mock Exception: Fake bad news.")
+    exception = Exception("Mock Exception")
     mock_response.set_exception(exception)
 
     await wait_for_state(dm, task_id, DownloadState.ERROR)
@@ -227,7 +227,7 @@ async def test_single_download_stop_on_5_errors(async_thread_runner, test_file_s
     
     await wait_for_state(dm, task_id, DownloadState.RUNNING)
 
-    exception = Exception("Mock Exception: Fake bad news.")
+    exception = Exception("Mock Exception")
     mock_response.set_exception(exception)
 
     n = 5

@@ -156,7 +156,7 @@ async def test_parallel_worker_continue_on_failure(test_file_setup_and_cleanup, 
     await wait_for_state(dm, task_id, DownloadState.ALLOCATING_SPACE)
     await wait_for_state(dm, task_id, DownloadState.RUNNING)
 
-    mock_response.set_exception(Exception("Fake: Something bad happened"))
+    mock_response.set_exception(Exception("Mock Exception"))
     
     await wait_for_state(dm, task_id, DownloadState.ERROR)
     mock_response.set_exception(None)
@@ -211,7 +211,7 @@ async def test_parallel_worker_stop_on_5_errors(test_file_setup_and_cleanup, asy
         data
     )
 
-    exception = Exception("Fake: Something bad happened")
+    exception = Exception("Mock Exception")
     mock_response.set_exception(exception)
 
     task_id = dm.add_download(mock_url, mock_file_name)
@@ -272,7 +272,7 @@ async def test_parallel_worker_pause_after_failure(test_file_setup_and_cleanup, 
         data
     )
     
-    exception = Exception("Fake: Something bad happened")
+    exception = Exception("Mock Exception")
     mock_response.set_exception(exception)
 
     task_id = dm.add_download(mock_url, mock_file_name)
@@ -333,7 +333,7 @@ async def test_parallel_worker_delete_after_failure(test_file_setup_and_cleanup,
         data
     )
     
-    exception = Exception("Fake: Something bad happened")
+    exception = Exception("Mock Exception")
     mock_response.set_exception(exception)
 
     task_id = dm.add_download(mock_url, mock_file_name)
@@ -392,7 +392,7 @@ async def test_parallel_worker_start_after_failure(test_file_setup_and_cleanup, 
         data
     )
     
-    exception = Exception("Fake: Something bad happened")
+    exception = Exception("Mock Exception")
     mock_response.set_exception(exception)
 
     task_id = dm.add_download(mock_url, mock_file_name)
