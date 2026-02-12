@@ -112,7 +112,7 @@ async def test_delete_from_error_state(async_thread_runner, test_file_setup_and_
     await wait_for_state(dm, task_id, DownloadState.ERROR)
 
     logging.debug("Download is now in error state, now run delete_download")
-    await dm.delete_download(task_id, remove_file=False)
+    async_thread_runner.submit(dm.delete_download(task_id, remove_file=False))
 
     await wait_for_state(dm, task_id, DownloadState.DELETED)
 
