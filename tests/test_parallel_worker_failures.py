@@ -365,7 +365,8 @@ async def test_parallel_worker_start_after_failure(test_file_setup_and_cleanup, 
     dm = DownloadManager(
         maximum_workers_per_task=n_workers, 
         parallel_download_segment_size=segment_size,
-        continue_on_error=continue_on_error
+        continue_on_error=continue_on_error,
+        stop_continue_on_n_errors=None
     )
     
     mock_url = "https://example.com/file.txt"
@@ -406,15 +407,16 @@ async def test_parallel_worker_start_after_failure(test_file_setup_and_cleanup, 
         async_thread_runner.submit(dm.pause_download(task_id))
         await wait_for_state(dm, task_id, DownloadState.PAUSED)
     
+    async_thread_runner.submit(dm.start_download(task_id))
+
+    for key in data:
+        mock_response.set_range_end_n_send(key, segment_size//2)
+
+    await wait_for_state(dm, task_id, DownloadState.RUNNING)
+
     for key in data:
         mock_response.set_range_end_n_send(key, segment_size)
         mock_response.set_range_end_done(key)
-    async_thread_runner.submit(dm.start_download(task_id))
-
-    if continue_on_error:
-        pass
-    else:
-        await wait_for_state(dm, task_id, DownloadState.RUNNING)
     
     for _ in range(n_workers + 1):
         await wait_for_state(dm, task_id, DownloadState.COMPLETED)

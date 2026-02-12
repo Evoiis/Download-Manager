@@ -945,7 +945,6 @@ class DownloadManager:
                         active_time=active_time
                     ))
                 
-                # Short wait before going back into the loop
                 if self._continue_on_error:
                     if self._stop_continue_on_n_errors is not None:
                         async with download.parallel_metadata.error_data_lock:
