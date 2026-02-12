@@ -100,7 +100,8 @@ async def test_parallel_download_pause(async_thread_runner, create_parallel_mock
 
     task_id = dm.add_download(mock_url, mock_file_name)
 
-    async_thread_runner.submit(dm.start_download(task_id, use_parallel_download=True)) 
+    future = async_thread_runner.submit(dm.start_download(task_id, use_parallel_download=True))
+    assert future.result(timeout=15)
     
     await wait_for_state(dm, task_id, DownloadState.ALLOCATING_SPACE)
     await wait_for_state(dm, task_id, DownloadState.RUNNING)
@@ -363,9 +364,7 @@ async def test_multiple_simultaneous_parallel_download(async_thread_runner, crea
 @pytest.mark.asyncio
 async def test_core_file_preallocation(test_file_setup_and_cleanup):
 
-    n_workers = 4
-    segment_size = 16 * 1024
-    dm = DownloadManager(maximum_workers_per_task=n_workers, parallel_download_segment_size=segment_size)
+    dm = DownloadManager()
 
     mock_file_name = f"{inspect.currentframe().f_code.co_name}.txt"
     mock_file_total_size = 9000

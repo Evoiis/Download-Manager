@@ -148,8 +148,8 @@ async def test_parallel_worker_continue_on_failure(test_file_setup_and_cleanup, 
     )
 
     # Send each worker half of their chunks
-    for key in list(data.keys()):
-        mock_response.set_range_end_n_send(key, segment_size//2)
+    for key in list(data.keys()[0]):
+        mock_response.set_range_end_n_send(key, segment_size)
 
     task_id = dm.add_download(mock_url, mock_file_name)
     async_thread_runner.submit(dm.start_download(task_id, use_parallel_download=True))
@@ -158,18 +158,19 @@ async def test_parallel_worker_continue_on_failure(test_file_setup_and_cleanup, 
     await wait_for_state(dm, task_id, DownloadState.RUNNING)
 
     mock_response.set_exception(Exception("Fake: Something bad happened"))
-
     
     await wait_for_state(dm, task_id, DownloadState.ERROR)
     mock_response.set_exception(None)
 
-    # Send the rest of the file
+    for key in data:
+        mock_response.set_range_end_n_send(key, segment_size//3)
+
+    await wait_for_state(dm, task_id, DownloadState.RUNNING)
+
     for key in data:
         mock_response.set_range_end_n_send(key, segment_size)
         mock_response.set_range_end_done(key)
 
-    await wait_for_state(dm, task_id, DownloadState.RUNNING)
-    
     for _ in range(2):
         await wait_for_state(dm, task_id, DownloadState.COMPLETED)
 

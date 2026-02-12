@@ -447,7 +447,8 @@ async def test_parallel_multiple_pauses_during_different_segments(async_thread_r
         mock_response.set_range_end_n_send(key, segment_size // 3)
     
     task_id = dm.add_download(mock_url, mock_file_name)
-    async_thread_runner.submit(dm.start_download(task_id, use_parallel_download=True))
+    future = async_thread_runner.submit(dm.start_download(task_id, use_parallel_download=True))
+    assert future.result(timeout=15)
     
     await wait_for_state(dm, task_id, DownloadState.ALLOCATING_SPACE)
     await wait_for_state(dm, task_id, DownloadState.RUNNING)

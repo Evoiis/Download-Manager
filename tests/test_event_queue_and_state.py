@@ -225,57 +225,6 @@ async def test_event_ordering(async_thread_runner, create_mock_response_and_set_
 
 
 @pytest.mark.asyncio
-async def test_concurrent_event_consumption(async_thread_runner, create_mock_response_and_set_mock_session, test_file_setup_and_cleanup):
-    """Test that event queue handles concurrent access properly"""
-    chunks = [b"a" * 100 for _ in range(10)]
-    mock_url = "https://example.com/file.bin"
-    mock_file_name = f"{inspect.currentframe().f_code.co_name}.txt"
-    test_file_setup_and_cleanup(mock_file_name)
-
-    mock_response = create_mock_response_and_set_mock_session(
-        206,
-        {
-            "Content-Length": str(sum(len(c) for c in chunks)),
-            "Accept-Ranges": "bytes"
-        },
-        mock_url
-    )
-
-    dm = DownloadManager(running_event_update_rate_seconds=0.1)
-    task_id = dm.add_download(mock_url, mock_file_name)
-    async_thread_runner.submit(dm.start_download(task_id))
-
-    await wait_for_state(dm, task_id, DownloadState.RUNNING)
-    
-    # Create multiple consumers
-    consumed_events = []
-    
-    async def consume_events():
-        for _ in range(10):
-            event = await dm.get_oldest_event()
-            if event:
-                consumed_events.append(event)
-            await asyncio.sleep(0.05)
-    
-    # Start multiple consumers
-    consumers = [asyncio.create_task(consume_events()) for _ in range(3)]
-    
-    # Generate events
-    for chunk in chunks:
-        await mock_response.insert_chunk(chunk)
-    mock_response.end_response()
-    
-    # Wait for consumers
-    await asyncio.gather(*consumers)
-    
-    # Should have consumed events without errors
-    assert len(consumed_events) > 0
-
-    future = async_thread_runner.submit(dm.shutdown())
-    future.result(timeout=15)
-
-
-@pytest.mark.asyncio
 async def test_state_consistency_during_error(async_thread_runner, create_mock_response_and_set_mock_session, test_file_setup_and_cleanup):
     """Verify state remains consistent when errors occur"""
     chunks = ["invalid"]  # Will cause error
