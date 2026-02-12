@@ -853,8 +853,8 @@ class DownloadManager:
                             active_time += timedelta(seconds=now - last_active_time_update)
                             last_active_time_update = now
 
-                            logging.debug(f"Task {download.task_id}, Worker {worker_id}. Before update calc.")
-                            if (time.monotonic() - last_running_update) > self._parallel_running_event_update_rate_seconds:
+                            logging.debug(f"Task {download.task_id}, Worker {worker_id}. Before update calc. {time.monotonic() - last_running_update=}, {self._parallel_running_event_update_rate_seconds=}")
+                            if (time.monotonic() - last_running_update) >= self._parallel_running_event_update_rate_seconds:
                                 logging.debug(f"Task {download.task_id}, Worker {worker_id}. Going to send running event.")
                                 last_running_update = time.monotonic()
 
