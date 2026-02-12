@@ -839,18 +839,23 @@ class DownloadManager:
                             await f.seek(next_write_byte)
                             await f.write(chunk)
 
+                            logging.debug(f"Task {download.task_id}, Worker {worker_id} finished write.")
+
                             next_write_byte += len(chunk)
 
                             async with download.parallel_metadata.worker_state_lock:
                                 download.downloaded_bytes += len(chunk)
                             
+                            logging.debug(f"Task {download.task_id}, Worker {worker_id}. Updated download metadata: {download=}")
                             speed_calc.add_bytes(len(chunk))
 
                             now = time.monotonic()
                             active_time += timedelta(seconds=now - last_active_time_update)
                             last_active_time_update = now
 
+                            logging.debug(f"Task {download.task_id}, Worker {worker_id}. Before update calc.")
                             if (time.monotonic() - last_running_update) > self._parallel_running_event_update_rate_seconds:
+                                logging.debug(f"Task {download.task_id}, Worker {worker_id}. Going to send running event.")
                                 last_running_update = time.monotonic()
 
                                 async with download.parallel_metadata.download_state_lock:
@@ -859,7 +864,7 @@ class DownloadManager:
                                     download.parallel_metadata.worker_states[worker_id] = DownloadState.RUNNING
 
                                 download_speed = speed_calc.get_speed()
-
+                                
                                 self._add_event_to_queue(DownloadEvent(
                                     task_id=download.task_id,
                                     state=DownloadState.RUNNING,
@@ -870,6 +875,7 @@ class DownloadManager:
                                     download_size_bytes=download.file_size_bytes,
                                     worker_id=worker_id
                                 ))            
+                                logging.debug(f"Task {download.task_id}, Worker {worker_id}. Sent running event.")
             except asyncio.CancelledError:
                 if next_write_byte != end_bytes:
                     download.parallel_metadata.leftover_segments.put_nowait((next_write_byte, end_bytes))
