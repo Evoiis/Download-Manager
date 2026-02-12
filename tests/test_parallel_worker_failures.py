@@ -148,7 +148,7 @@ async def test_parallel_worker_continue_on_failure(test_file_setup_and_cleanup, 
     )
 
     # Send each worker half of their chunks
-    for key in list(data.keys()[0]):
+    for key in list(data.keys())[0]:
         mock_response.set_range_end_n_send(key, segment_size)
 
     task_id = dm.add_download(mock_url, mock_file_name)
