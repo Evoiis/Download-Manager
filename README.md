@@ -23,10 +23,11 @@ A python download manager for Windows.
 
 1. Install python and git on Windows.
 2. Clone the repository in git bash with `git clone https://github.com/Evoiis/Download-Manager.git`
-3. Open the repo folder with git bash and create a virtual environment: `python -m venv venv & . venv/Scripts/activate`
-4. Install dependencies with: `pip install -r requirements`
-5. Run the program with: `python main.py`
-6. Copy-Paste direct download links into Download URL input and press Add Download!
+3. Open the repo folder with git bash and create a virtual environment: `python -m venv venv`
+4. Then activate the virtual environment with: `. venv/Scripts/activate`
+5. Install dependencies with: `pip install -r requirements`
+6. Run the program with: `python main.py`
+7. Copy-Paste direct download links into Download URL input and press Add Download!
 
 ### Tests
 
