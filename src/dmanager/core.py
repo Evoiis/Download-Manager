@@ -629,10 +629,10 @@ class DownloadManager:
                 for task in task_pool:
                     if not task.done():
                         task.cancel()
-                try:
-                    await task
-                except asyncio.CancelledError:
-                    pass
+                    try:
+                        await task
+                    except asyncio.CancelledError:
+                        pass
                 if task_id in self._task_pools:
                     logging.debug(f"Deleting {task_id} from {self._task_pools=}")
                     del self._task_pools[task_id]
@@ -963,8 +963,7 @@ class DownloadManager:
                                     task = asyncio.create_task(self.pause_download(download.task_id))
                                     self._extra_tasks.append(task)
                                 return
-                    else:
-                        await asyncio.sleep(0.1)
+                    await asyncio.sleep(0.1)
                 else:
                     async with self._extra_tasks_lock:
                         task = asyncio.create_task(self.pause_download(download.task_id))
@@ -1054,12 +1053,6 @@ class DownloadManager:
 
                 return
             except asyncio.CancelledError:
-                # download.state = DownloadState.PAUSED
-                # self._add_event_to_queue(DownloadEvent(
-                #     task_id=download.task_id,
-                #     state= download.state,
-                #     output_file=download.output_file
-                # ))
                 raise
             except Exception as err:
                 if self._log_tracebacks:
@@ -1070,9 +1063,8 @@ class DownloadManager:
                 download.error_count += 1
                 if self._continue_on_error:
                     if self._stop_continue_on_n_errors is not None and download.error_count >= self._stop_continue_on_n_errors:
-                        raise
-                    else:
-                        await asyncio.sleep(2)
+                        return
+                    await asyncio.sleep(2)
                 else:
                     return
 
