@@ -216,8 +216,7 @@ class DownloadManager:
 
             # Cancel them all at once
             for task in all_tasks:
-                if not task.done():
-                    task.cancel()
+                task.cancel()
 
             results = await asyncio.gather(*all_tasks, return_exceptions=True)
 
@@ -232,8 +231,7 @@ class DownloadManager:
             async with self._extra_tasks_lock:
                 if self._extra_tasks:
                     for task in self._extra_tasks:
-                        if not task.done():
-                            task.cancel()
+                        task.cancel()
 
                     results = await asyncio.gather(*self._extra_tasks, return_exceptions=True)
 
@@ -523,8 +521,7 @@ class DownloadManager:
             if download.state == DownloadState.ALLOCATING_SPACE:
                 if task_id in self._preallocate_tasks:
                     task = self._preallocate_tasks[task_id]
-                    if not task.done():
-                        task.cancel()
+                    task.cancel()
                     try: 
                         await task
                     except asyncio.CancelledError:
@@ -544,26 +541,27 @@ class DownloadManager:
                     return False
                 task_pool = self._task_pools[task_id]
                 logging.debug(f"[pause_download] stopping {len(task_pool)} workers from task {task_id=}")
+
                 for task in task_pool:
-                    if not task.done():
-                        task.cancel()
-                    try:
-                        await task
-                    except asyncio.CancelledError:
-                        pass
+                    task.cancel()
+
+                results = await asyncio.gather(*task_pool, return_exceptions=True)
+                for res in results:
+                    if isinstance(res, Exception) and not isinstance(res, asyncio.CancelledError):
+                        logging.error(f"Task raised during shutdown: {res}", exc_info=True)
+
                 if download.task_id in self._task_pools:
                     del self._task_pools[download.task_id]
             else:
                 if task_id not in self._tasks:
                     raise Exception("Error: [pause_download], task_id not in DownloadManager task list")
                 task = self._tasks[task_id]
-                logging.debug(f"[pause_download] stopping worker from task {task_id=}")
-                if not task.done():
-                    task.cancel()
-                    try:
-                        await task
-                    except asyncio.CancelledError:
-                        pass
+                logging.debug(f"[pause_download] stopping worker from task {task_id=}")                
+                task.cancel()
+                try:
+                    await task
+                except asyncio.CancelledError:
+                    pass
                 
                 if task_id in self._tasks:
                     del self._tasks[task_id]
@@ -614,8 +612,7 @@ class DownloadManager:
             if task_id in self._tasks:
                 task = self._tasks[task_id]
                 logging.debug(f"[delete_download] stopping worker from task {task_id=}")
-                if not task.done():
-                    task.cancel()
+                task.cancel()
                 try:
                     await task
                 except asyncio.CancelledError:
@@ -627,12 +624,13 @@ class DownloadManager:
                 task_pool = self._task_pools[task_id]
                 logging.debug(f"[delete_download] stopping {len(task_pool)} workers from task {task_id=}")
                 for task in task_pool:
-                    if not task.done():
-                        task.cancel()
-                try:
-                    await task
-                except asyncio.CancelledError:
-                    pass
+                    task.cancel()
+
+                results = await asyncio.gather(*task_pool, return_exceptions=True)
+                for res in results:
+                    if isinstance(res, Exception) and not isinstance(res, asyncio.CancelledError):
+                        logging.error(f"Task raised during shutdown: {res}", exc_info=True)
+
                 if task_id in self._task_pools:
                     logging.debug(f"Deleting {task_id} from {self._task_pools=}")
                     del self._task_pools[task_id]
@@ -963,8 +961,7 @@ class DownloadManager:
                                     task = asyncio.create_task(self.pause_download(download.task_id))
                                     self._extra_tasks.append(task)
                                 return
-                    else:
-                        await asyncio.sleep(0.1)
+                    await asyncio.sleep(0.1)
                 else:
                     async with self._extra_tasks_lock:
                         task = asyncio.create_task(self.pause_download(download.task_id))
@@ -1054,12 +1051,6 @@ class DownloadManager:
 
                 return
             except asyncio.CancelledError:
-                # download.state = DownloadState.PAUSED
-                # self._add_event_to_queue(DownloadEvent(
-                #     task_id=download.task_id,
-                #     state= download.state,
-                #     output_file=download.output_file
-                # ))
                 raise
             except Exception as err:
                 if self._log_tracebacks:
@@ -1070,9 +1061,8 @@ class DownloadManager:
                 download.error_count += 1
                 if self._continue_on_error:
                     if self._stop_continue_on_n_errors is not None and download.error_count >= self._stop_continue_on_n_errors:
-                        raise
-                    else:
-                        await asyncio.sleep(2)
+                        return
+                    await asyncio.sleep(2)
                 else:
                     return
 
